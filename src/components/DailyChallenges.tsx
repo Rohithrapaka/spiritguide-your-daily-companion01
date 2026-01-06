@@ -4,8 +4,7 @@ import { getDailyQuests, SoulQuest } from '@/lib/dailyChallenges';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/integrations/supabase/client';
 
 export const DailyChallenges: React.FC = () => {
   const [quests, setQuests] = useState<SoulQuest[]>([]);
@@ -21,11 +20,23 @@ export const DailyChallenges: React.FC = () => {
 
   const loadCompletedQuests = async () => {
     if (!user) return;
-    const today = new Date().toDateString();
-    const docRef = doc(db, 'daily_challenges', `${user.uid}_${today}`);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      setCompletedIds(new Set(docSnap.data().completedIds || []));
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+      .from('daily_challenges')
+      .select('completed_quests')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error loading challenges:', error);
+      return;
+    }
+
+    if (data) {
+      setCompletedIds(new Set(data.completed_quests || []));
     }
   };
 
@@ -45,13 +56,23 @@ export const DailyChallenges: React.FC = () => {
     
     setCompletedIds(newCompletedIds);
 
-    // Save to Firebase
-    const today = new Date().toDateString();
-    await setDoc(doc(db, 'daily_challenges', `${user.uid}_${today}`), {
-      completedIds: Array.from(newCompletedIds),
-      date: today,
-      userId: user.uid
-    });
+    const today = new Date().toISOString().split('T')[0];
+    const completedArray = Array.from(newCompletedIds);
+
+    // Upsert: insert or update on conflict
+    const { error } = await supabase
+      .from('daily_challenges')
+      .upsert({
+        user_id: user.id,
+        date: today,
+        completed_quests: completedArray
+      }, {
+        onConflict: 'user_id,date'
+      });
+
+    if (error) {
+      console.error('Error saving challenges:', error);
+    }
   };
 
   const completedCount = completedIds.size;

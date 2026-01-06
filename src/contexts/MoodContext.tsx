@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, addDoc, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
 export type MoodTag = 'Anxious' | 'Calm' | 'Tired' | 'Energetic' | 'Motivated' | 'Peaceful' | 'Stressed' | 'Happy';
@@ -44,37 +43,54 @@ export const MoodProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saveMoodEntry = async () => {
     if (!user) return;
 
-    const entry: Omit<MoodEntry, 'id'> = {
-      score: currentMood,
-      tags: currentTags,
-      timestamp: new Date(),
-      userId: user.uid
+    const { data, error } = await supabase
+      .from('mood_logs')
+      .insert({
+        user_id: user.id,
+        score: currentMood,
+        tags: currentTags
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving mood entry:', error);
+      return;
+    }
+
+    const newEntry: MoodEntry = {
+      id: data.id,
+      score: data.score,
+      tags: data.tags as MoodTag[],
+      timestamp: new Date(data.created_at),
+      userId: data.user_id
     };
 
-    await addDoc(collection(db, 'mood_logs'), {
-      ...entry,
-      timestamp: Timestamp.fromDate(entry.timestamp)
-    });
-
-    setMoodHistory(prev => [{ ...entry, id: Date.now().toString() }, ...prev]);
+    setMoodHistory(prev => [newEntry, ...prev]);
     setHasCheckedInToday(true);
   };
 
   const loadMoodHistory = async () => {
     if (!user) return;
 
-    const q = query(
-      collection(db, 'mood_logs'),
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'desc')
-    );
+    const { data, error } = await supabase
+      .from('mood_logs')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-    const snapshot = await getDocs(q);
-    const entries: MoodEntry[] = snapshot.docs.map(doc => ({
+    if (error) {
+      console.error('Error loading mood history:', error);
+      return;
+    }
+
+    const entries: MoodEntry[] = data.map(doc => ({
       id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp.toDate()
-    })) as MoodEntry[];
+      score: doc.score,
+      tags: doc.tags as MoodTag[],
+      timestamp: new Date(doc.created_at),
+      userId: doc.user_id
+    }));
 
     setMoodHistory(entries);
 

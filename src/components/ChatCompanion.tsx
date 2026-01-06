@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Ghost, AlertTriangle, Phone, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Ghost, Phone, Loader2 } from 'lucide-react';
 import { useMood } from '@/contexts/MoodContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -48,7 +49,7 @@ export const ChatCompanion: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentMood } = useMood();
   const { privacyMode, isBlurred } = usePrivacy();
-  const { userProfile } = useAuth();
+  const { user, userProfile } = useAuth();
   const { theme } = useTheme();
 
   const scrollToBottom = () => {
@@ -60,9 +61,56 @@ export const ChatCompanion: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    // Show crisis button if mood is very low
     setShowCrisisButton(currentMood <= 3);
   }, [currentMood]);
+
+  // Load chat history on mount (if not in privacy mode)
+  useEffect(() => {
+    if (user && !privacyMode) {
+      loadChatHistory();
+    }
+  }, [user, privacyMode]);
+
+  const loadChatHistory = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('chats')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    if (error) {
+      console.error('Error loading chat history:', error);
+      return;
+    }
+
+    const loadedMessages: Message[] = data.map(msg => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      timestamp: new Date(msg.created_at)
+    }));
+
+    setMessages(loadedMessages);
+  };
+
+  const saveMessage = async (message: Message) => {
+    if (!user || privacyMode) return;
+
+    const { error } = await supabase
+      .from('chats')
+      .insert({
+        user_id: user.id,
+        role: message.role,
+        content: message.content
+      });
+
+    if (error) {
+      console.error('Error saving message:', error);
+    }
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -77,6 +125,9 @@ export const ChatCompanion: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+
+    // Save user message
+    await saveMessage(userMessage);
 
     try {
       const systemPrompt = getSystemPrompt(currentMood, userProfile?.name || 'Student');
@@ -121,6 +172,9 @@ export const ChatCompanion: React.FC = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Save assistant message
+      await saveMessage(assistantMessage);
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
