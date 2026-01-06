@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { 
   User, 
   signInWithEmailAndPassword, 
@@ -26,7 +26,15 @@ interface AuthContextType {
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  userProfile: null,
+  loading: true,
+  signIn: async () => {},
+  signUp: async () => {},
+  logout: async () => {},
+  updateProfile: async () => {}
+});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -34,20 +42,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        const profileDoc = await getDoc(doc(db, 'users', user.uid));
-        if (profileDoc.exists()) {
-          setUserProfile(profileDoc.data() as UserProfile);
+    try {
+      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          try {
+            const profileDoc = await getDoc(doc(db, 'users', currentUser.uid));
+            if (profileDoc.exists()) {
+              setUserProfile(profileDoc.data() as UserProfile);
+            }
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+          }
+        } else {
+          setUserProfile(null);
         }
-      } else {
-        setUserProfile(null);
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      });
 
-    return unsubscribe;
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      setLoading(false);
+    }
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -55,12 +72,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, profile: Omit<UserProfile, 'createdAt'>) => {
-    const { user } = await createUserWithEmailAndPassword(auth, email, password);
+    const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
     const fullProfile: UserProfile = {
       ...profile,
       createdAt: new Date()
     };
-    await setDoc(doc(db, 'users', user.uid), fullProfile);
+    await setDoc(doc(db, 'users', newUser.uid), fullProfile);
     setUserProfile(fullProfile);
   };
 
@@ -75,17 +92,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(prev => prev ? { ...prev, ...profile } : null);
   };
 
+  const value = useMemo(() => ({
+    user,
+    userProfile,
+    loading,
+    signIn,
+    signUp,
+    logout,
+    updateProfile
+  }), [user, userProfile, loading]);
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, logout, updateProfile }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return useContext(AuthContext);
 };
