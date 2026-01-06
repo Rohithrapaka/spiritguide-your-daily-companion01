@@ -30,9 +30,13 @@ export const AuthPage: React.FC = () => {
 
     try {
       if (isLogin) {
-        await signIn(email, password);
-        toast.success('Welcome back!');
-        navigate('/');
+        const { error } = await signIn(email, password);
+        if (error) {
+          toast.error(error.message || 'Failed to sign in');
+        } else {
+          toast.success('Welcome back!');
+          navigate('/');
+        }
       } else {
         setStep('onboarding');
       }
@@ -48,21 +52,26 @@ export const AuthPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await signUp(email, password, {
+      const { error } = await signUp(email, password, {
         name,
-        age: parseInt(age),
-        major
+        age: parseInt(age) || null,
+        major: major || null
       });
-      toast.success(`Welcome to SpiritGuide, ${name}!`);
-      navigate('/');
-    } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        toast.error('This email is already registered. Please sign in instead.');
-        setIsLogin(true);
-        setStep('auth');
+      
+      if (error) {
+        if (error.message?.includes('already registered')) {
+          toast.error('This email is already registered. Please sign in instead.');
+          setIsLogin(true);
+          setStep('auth');
+        } else {
+          toast.error(error.message || 'Failed to create account');
+        }
       } else {
-        toast.error(error.message || 'Failed to create account');
+        toast.success(`Welcome to SpiritGuide, ${name}!`);
+        navigate('/');
       }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
