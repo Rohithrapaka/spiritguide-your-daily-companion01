@@ -7,6 +7,17 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface Message {
   id: string;
@@ -15,6 +26,8 @@ interface Message {
   timestamp: Date;
   isError?: boolean;
 }
+
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const getSystemPrompt = (moodScore: number, userName: string) => {
   const moodContext = moodScore <= 4 
@@ -45,6 +58,7 @@ export const ChatCompanion: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showCrisisButton, setShowCrisisButton] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentMood } = useMood();
   const { privacyMode, isBlurred } = usePrivacy();
@@ -57,7 +71,7 @@ export const ChatCompanion: React.FC = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, streamingContent]);
 
   useEffect(() => {
     setShowCrisisButton(currentMood <= 3);
@@ -125,6 +139,7 @@ export const ChatCompanion: React.FC = () => {
     const userInput = input.trim();
     setInput('');
     setIsLoading(true);
+    setStreamingContent('');
 
     // Save user message
     await saveMessage(userMessage);
@@ -138,36 +153,64 @@ export const ChatCompanion: React.FC = () => {
         { role: 'user' as const, content: userInput }
       ];
 
-      // Call the edge function
-      const { data, error } = await supabase.functions.invoke('chat', {
-        body: { 
+      // Call with streaming
+      const resp = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
           messages: conversationHistory,
           systemPrompt 
-        }
+        }),
       });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Failed to connect to AI');
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.error || `Request failed with status ${resp.status}`);
       }
 
-      if (data?.error) {
-        console.error('API error:', data.error);
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: data.error,
-          timestamp: new Date(),
-          isError: true
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        return;
+      if (!resp.body) {
+        throw new Error('No response body');
       }
 
-      const aiContent = data?.content;
-      
-      if (!aiContent) {
-        throw new Error('No response from AI');
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = '';
+      let fullContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line.startsWith(':') || line.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') break;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              fullContent += content;
+              setStreamingContent(fullContent);
+            }
+          } catch {
+            // Incomplete JSON, put it back
+            textBuffer = line + '\n' + textBuffer;
+            break;
+          }
+        }
       }
 
       // Check for crisis keywords
@@ -179,16 +222,18 @@ export const ChatCompanion: React.FC = () => {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: aiContent,
+        content: fullContent || "I'm here for you. Could you tell me more?",
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      setStreamingContent('');
       
       // Save assistant message
       await saveMessage(assistantMessage);
     } catch (error) {
       console.error('Chat error:', error);
+      setStreamingContent('');
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -264,15 +309,35 @@ export const ChatCompanion: React.FC = () => {
 
         <div className="flex items-center gap-2">
           {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={clearChat}
-              className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
-              title="Clear chat"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
+                  title="Clear chat"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear conversation?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all messages in this conversation. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={clearChat}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Clear chat
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
 
           {showCrisisButton && (
@@ -292,7 +357,7 @@ export const ChatCompanion: React.FC = () => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !streamingContent && (
           <div className="text-center py-8">
             <Bot className="h-12 w-12 mx-auto mb-4 text-primary/50" />
             <p className="text-muted-foreground">
@@ -347,7 +412,32 @@ export const ChatCompanion: React.FC = () => {
           </div>
         ))}
 
-        {isLoading && (
+        {/* Streaming message */}
+        {streamingContent && (
+          <div className="flex gap-3 animate-fade-in">
+            <div className={cn(
+              "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
+              theme === 'warm' ? "bg-sage-light" : "bg-accent/20"
+            )}>
+              {privacyMode ? (
+                <Ghost className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Bot className="h-4 w-4 text-primary" />
+              )}
+            </div>
+            <div className={cn(
+              "max-w-[75%] rounded-2xl px-4 py-3",
+              theme === 'warm' ? "bg-secondary" : "bg-muted"
+            )}>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {streamingContent}
+                <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse" />
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isLoading && !streamingContent && (
           <div className="flex gap-3">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center",
