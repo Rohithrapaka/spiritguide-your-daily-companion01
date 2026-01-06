@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Ghost, Phone, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle } from 'lucide-react';
 import { useMood } from '@/contexts/MoodContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,9 +13,8 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  isError?: boolean;
 }
-
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const getSystemPrompt = (moodScore: number, userName: string) => {
   const moodContext = moodScore <= 4 
@@ -123,6 +122,7 @@ export const ChatCompanion: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input.trim();
     setInput('');
     setIsLoading(true);
 
@@ -132,35 +132,47 @@ export const ChatCompanion: React.FC = () => {
     try {
       const systemPrompt = getSystemPrompt(currentMood, userProfile?.name || 'Student');
       
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              ...messages.map(m => ({
-                role: m.role === 'user' ? 'user' : 'model',
-                parts: [{ text: m.content }]
-              })),
-              { role: 'user', parts: [{ text: input.trim() }] }
-            ],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 500
-            }
-          })
-        }
-      );
+      // Build conversation history for the API
+      const conversationHistory = [
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user' as const, content: userInput }
+      ];
 
-      const data = await response.json();
-      const aiContent = data.candidates?.[0]?.content?.parts?.[0]?.text || 
-        "I'm here for you. Could you tell me more about how you're feeling?";
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: { 
+          messages: conversationHistory,
+          systemPrompt 
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to connect to AI');
+      }
+
+      if (data?.error) {
+        console.error('API error:', data.error);
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.error,
+          timestamp: new Date(),
+          isError: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+
+      const aiContent = data?.content;
+      
+      if (!aiContent) {
+        throw new Error('No response from AI');
+      }
 
       // Check for crisis keywords
       const crisisKeywords = ['suicide', 'hurt myself', 'end it', 'kill myself', 'self-harm'];
-      if (crisisKeywords.some(kw => input.toLowerCase().includes(kw))) {
+      if (crisisKeywords.some(kw => userInput.toLowerCase().includes(kw))) {
         setShowCrisisButton(true);
       }
 
@@ -180,8 +192,11 @@ export const ChatCompanion: React.FC = () => {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I'm having trouble connecting right now. Please try again in a moment. Remember, I'm here for you.",
-        timestamp: new Date()
+        content: error instanceof Error 
+          ? `⚠️ ${error.message}` 
+          : "⚠️ I'm having trouble connecting right now. Please try again in a moment.",
+        timestamp: new Date(),
+        isError: true
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -280,10 +295,18 @@ export const ChatCompanion: React.FC = () => {
               "max-w-[75%] rounded-2xl px-4 py-3",
               message.role === 'user'
                 ? "bg-primary text-primary-foreground"
-                : theme === 'warm' 
-                  ? "bg-secondary" 
-                  : "bg-muted"
+                : message.isError
+                  ? "bg-destructive/10 border border-destructive/20"
+                  : theme === 'warm' 
+                    ? "bg-secondary" 
+                    : "bg-muted"
             )}>
+              {message.isError && (
+                <div className="flex items-center gap-2 mb-1 text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-xs font-medium">Error</span>
+                </div>
+              )}
               <p className="text-sm leading-relaxed whitespace-pre-wrap">
                 {message.content}
               </p>
