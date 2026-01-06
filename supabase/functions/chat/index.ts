@@ -23,7 +23,7 @@ serve(async (req) => {
       );
     }
 
-    console.log("Calling Lovable AI Gateway with", messages.length, "messages");
+    console.log("Calling Lovable AI Gateway with streaming, messages:", messages.length);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -40,6 +40,7 @@ serve(async (req) => {
             content: m.content
           }))
         ],
+        stream: true,
       })
     });
 
@@ -67,23 +68,12 @@ serve(async (req) => {
       );
     }
 
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content;
-    
-    if (!aiContent) {
-      console.error("No content in AI response:", JSON.stringify(data));
-      return new Response(
-        JSON.stringify({ error: "No response generated" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log("Streaming response started");
 
-    console.log("AI response received successfully");
-
-    return new Response(
-      JSON.stringify({ content: aiContent }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // Return the stream directly
+    return new Response(response.body, {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    });
   } catch (error) {
     console.error("Chat function error:", error);
     return new Response(
