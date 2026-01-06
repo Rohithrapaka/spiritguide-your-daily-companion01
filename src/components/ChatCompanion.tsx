@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle } from 'lucide-react';
+import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { useMood } from '@/contexts/MoodContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -211,6 +211,25 @@ export const ChatCompanion: React.FC = () => {
     }
   };
 
+  const clearChat = async () => {
+    if (!user) return;
+    
+    // Clear local state
+    setMessages([]);
+    
+    // Delete from database if not in privacy mode
+    if (!privacyMode) {
+      const { error } = await supabase
+        .from('chats')
+        .delete()
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error('Error clearing chat history:', error);
+      }
+    }
+  };
+
   return (
     <div className={cn(
       "flex flex-col h-[500px] rounded-3xl overflow-hidden transition-all duration-500",
@@ -243,18 +262,32 @@ export const ChatCompanion: React.FC = () => {
           </div>
         </div>
 
-        {showCrisisButton && (
-          <a
-            href="tel:988"
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium",
-              "bg-destructive text-destructive-foreground animate-pulse"
-            )}
-          >
-            <Phone className="h-4 w-4" />
-            Crisis Line: 988
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={clearChat}
+              className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
+              title="Clear chat"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+
+          {showCrisisButton && (
+            <a
+              href="tel:988"
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium",
+                "bg-destructive text-destructive-foreground animate-pulse"
+              )}
+            >
+              <Phone className="h-4 w-4" />
+              Crisis Line: 988
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
