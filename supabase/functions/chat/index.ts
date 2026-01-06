@@ -13,38 +13,39 @@ serve(async (req) => {
   try {
     const { messages, systemPrompt } = await req.json();
     
-    const GEMINI_API_KEY = Deno.env.get("VITE_GEMINI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
-    if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY is not configured");
       return new Response(
         JSON.stringify({ error: "API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: messages.map((m: { role: string; content: string }) => ({
-            role: m.role === "user" ? "user" : "model",
-            parts: [{ text: m.content }]
-          })),
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 500
-          }
-        })
-      }
-    );
+    console.log("Calling Lovable AI Gateway with", messages.length, "messages");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages.map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content
+          }))
+        ],
+      })
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
+      console.error("Lovable AI error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -53,10 +54,10 @@ serve(async (req) => {
         );
       }
       
-      if (response.status === 400 || response.status === 403) {
+      if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "API key is invalid or expired. Please check your configuration." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
@@ -67,15 +68,17 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const aiContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const aiContent = data.choices?.[0]?.message?.content;
     
     if (!aiContent) {
-      console.error("No content in Gemini response:", JSON.stringify(data));
+      console.error("No content in AI response:", JSON.stringify(data));
       return new Response(
         JSON.stringify({ error: "No response generated" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("AI response received successfully");
 
     return new Response(
       JSON.stringify({ content: aiContent }),
