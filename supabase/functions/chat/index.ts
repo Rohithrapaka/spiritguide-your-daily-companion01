@@ -18,12 +18,12 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY is not configured");
       return new Response(
-        JSON.stringify({ error: "API key not configured" }),
+        JSON.stringify({ error: "API key not configured. Please contact support." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Calling Lovable AI Gateway with streaming, messages:", messages.length);
+    console.log(`[chat] Starting streaming request with ${messages.length} messages`);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Lovable AI error:", response.status, errorText);
+      console.error(`[chat] API error: ${response.status}`, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -63,21 +63,26 @@ serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ error: "Failed to get response from AI" }),
+        JSON.stringify({ error: `AI service error: ${response.status}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Streaming response started");
+    console.log("[chat] Streaming response to client");
 
-    // Return the stream directly
+    // Pass through the stream directly
     return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
     });
   } catch (error) {
-    console.error("Chat function error:", error);
+    console.error("[chat] Function error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Connection failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
