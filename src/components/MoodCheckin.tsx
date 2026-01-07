@@ -38,7 +38,7 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
 
   return (
     <div className={cn(
-      "rounded-3xl p-6 md:p-8 transition-all duration-500",
+      "rounded-3xl p-7 md:p-8 transition-all duration-300",
       theme === 'warm' ? "warm-card" : "glass-card"
     )}>
       <div className="text-center mb-6">
@@ -54,16 +54,16 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
       </div>
 
       {/* Mood Slider */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className={cn("transition-all duration-300", moodInfo.color)}>
+      <div className="mb-9">
+        <div className="flex items-center justify-center gap-4 mb-5">
+          <div className={cn("transition-all duration-200", moodInfo.color)}>
             {moodInfo.icon}
           </div>
           <div className="text-center">
             <span className="text-4xl font-bold">{currentMood}</span>
-            <span className="text-lg text-muted-foreground">/10</span>
+            <span className="text-lg text-muted-foreground/70">/10</span>
           </div>
-          <span className={cn("font-medium", moodInfo.color)}>{moodInfo.label}</span>
+          <span className={cn("font-medium text-sm", moodInfo.color)}>{moodInfo.label}</span>
         </div>
 
         <div className="relative px-2">
@@ -75,10 +75,10 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
             onChange={(e) => setCurrentMood(Number(e.target.value))}
             className="mood-slider w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground mt-2">
-            <span>Sad</span>
+          <div className="flex justify-between text-xs text-muted-foreground/60 mt-3">
+            <span>Struggling</span>
             <span>Balanced</span>
-            <span>Happy</span>
+            <span>Thriving</span>
           </div>
         </div>
       </div>
@@ -116,9 +116,9 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
         <Button
           onClick={handleSave}
           className={cn(
-            "px-8 py-3 rounded-full font-semibold transition-all duration-300",
-            "bg-primary hover:bg-primary/90 text-primary-foreground",
-            "shadow-glow hover:shadow-lg"
+            "px-8 py-3.5 rounded-full font-semibold transition-all duration-200",
+            "bg-primary/90 hover:bg-primary text-primary-foreground",
+            "shadow-sm hover:shadow-md"
           )}
         >
           <Sparkles className="h-4 w-4 mr-2" />

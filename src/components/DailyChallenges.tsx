@@ -80,28 +80,28 @@ export const DailyChallenges: React.FC = () => {
 
   return (
     <div className={cn(
-      "rounded-3xl p-6 transition-all duration-500",
+      "rounded-3xl p-7 transition-all duration-300",
       theme === 'warm' ? "warm-card" : "glass-card"
     )}>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-7">
         <div>
           <h3 className="font-serif text-xl font-semibold flex items-center gap-2">
-            <Star className="h-5 w-5 text-accent" />
+            <Star className="h-5 w-5 text-accent/80" />
             Soul Quests
           </h3>
-          <p className="text-sm text-muted-foreground">Daily challenges for your wellbeing</p>
+          <p className="text-sm text-muted-foreground/80 mt-1">Daily wellness activities</p>
         </div>
         <div className={cn(
-          "px-3 py-1 rounded-full text-sm font-semibold",
+          "px-3.5 py-1.5 rounded-full text-sm font-semibold",
           completedCount === totalQuests 
-            ? "bg-primary text-primary-foreground" 
-            : "bg-secondary text-secondary-foreground"
+            ? "bg-primary/90 text-primary-foreground" 
+            : "bg-secondary/80 text-secondary-foreground"
         )}>
           {completedCount}/{totalQuests}
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3.5">
         {quests.map((quest) => {
           const isCompleted = completedIds.has(quest.id);
           const isSparkle = sparklingId === quest.id;
@@ -111,21 +111,21 @@ export const DailyChallenges: React.FC = () => {
               key={quest.id}
               onClick={() => toggleQuest(quest.id)}
               className={cn(
-                "w-full flex items-start gap-4 p-4 rounded-2xl transition-all duration-300",
+                "w-full flex items-start gap-4 p-4 rounded-2xl transition-all duration-200",
                 "text-left group",
                 isCompleted 
                   ? theme === 'warm' 
-                    ? "bg-sage-light/50" 
-                    : "bg-primary/10"
-                  : "bg-secondary/50 hover:bg-secondary"
+                    ? "bg-sage-light/40" 
+                    : "bg-primary/8"
+                  : "bg-secondary/40 hover:bg-secondary/60"
               )}
             >
               <div className={cn(
-                "relative flex-shrink-0 w-6 h-6 rounded-full border-2 transition-all duration-300",
+                "relative flex-shrink-0 w-6 h-6 rounded-full border-2 transition-all duration-200",
                 "flex items-center justify-center",
                 isCompleted 
-                  ? "bg-primary border-primary" 
-                  : "border-border group-hover:border-primary"
+                  ? "bg-primary/90 border-primary/90" 
+                  : "border-border/60 group-hover:border-primary/50"
               )}>
                 {isCompleted && (
                   <Check className={cn(
@@ -155,7 +155,7 @@ export const DailyChallenges: React.FC = () => {
                   </h4>
                 </div>
                 <p className={cn(
-                  "text-sm text-muted-foreground mt-1",
+                  "text-sm text-muted-foreground/80 mt-1 leading-relaxed",
                   isCompleted && "line-through opacity-50"
                 )}>
                   {quest.description}

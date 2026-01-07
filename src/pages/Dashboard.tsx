@@ -62,16 +62,16 @@ export const Dashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className={cn(
-        "container mx-auto px-4 py-8",
+        "container mx-auto px-4 sm:px-6 py-10",
         isBlurred && "privacy-blur"
       )}>
         {activeTab === 'home' && (
-          <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+          <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
             {/* Wisdom Quote */}
             <WisdomCard />
 
             {/* Mood Check-in & Daily Challenges Grid */}
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-8">
               <MoodCheckin />
               <DailyChallenges />
             </div>
@@ -79,22 +79,23 @@ export const Dashboard: React.FC = () => {
             {/* Quick Chat Prompt */}
             {hasCheckedInToday && (
               <div className={cn(
-                "rounded-3xl p-6 text-center transition-all duration-500",
+                "rounded-3xl p-8 text-center transition-all duration-500",
                 theme === 'warm' ? "warm-card" : "glass-card"
               )}>
-                <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary" />
+                <Sparkles className="h-8 w-8 mx-auto mb-4 text-primary/70" />
                 <h3 className="font-serif text-lg font-semibold mb-2">
                   Ready to talk?
                 </h3>
-                <p className="text-muted-foreground mb-4">
+                <p className="text-muted-foreground mb-5 max-w-md mx-auto leading-relaxed">
                   Your AI companion is here to listen and support you.
                 </p>
                 <button
                   onClick={() => setActiveTab('chat')}
                   className={cn(
-                    "inline-flex items-center gap-2 px-6 py-3 rounded-full",
-                    "bg-primary text-primary-foreground font-semibold",
-                    "hover:bg-primary/90 transition-all duration-300 shadow-glow"
+                    "inline-flex items-center gap-2 px-7 py-3.5 rounded-full",
+                    "bg-primary/90 text-primary-foreground font-semibold",
+                    "hover:bg-primary transition-all duration-200",
+                    "shadow-sm hover:shadow-md"
                   )}
                 >
                   <MessageCircle className="h-5 w-5" />
@@ -106,13 +107,13 @@ export const Dashboard: React.FC = () => {
         )}
 
         {activeTab === 'chat' && (
-          <div className="max-w-2xl mx-auto animate-fade-in">
+          <div className="max-w-xl mx-auto animate-fade-in">
             <ChatCompanion />
           </div>
         )}
 
         {activeTab === 'progress' && (
-          <div className="max-w-4xl mx-auto animate-fade-in">
+          <div className="max-w-3xl mx-auto animate-fade-in">
             <MoodAnalytics />
           </div>
         )}
