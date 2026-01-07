@@ -314,19 +314,19 @@ export const ChatCompanion: React.FC = () => {
 
   return (
     <div className={cn(
-      "flex flex-col h-[500px] rounded-3xl overflow-hidden transition-all duration-500",
+      "flex flex-col h-[540px] rounded-3xl overflow-hidden transition-all duration-300",
       theme === 'warm' ? "warm-card" : "glass-card",
       isBlurred && "privacy-blur"
     )}>
       {/* Header */}
       <div className={cn(
-        "flex items-center justify-between p-4 border-b border-border",
-        theme === 'dark' && "bg-background/50"
+        "flex items-center justify-between px-5 py-4 border-b border-border/30",
+        theme === 'dark' && "bg-background/40"
       )}>
         <div className="flex items-center gap-3">
           <div className={cn(
-            "p-2 rounded-full",
-            privacyMode ? "bg-muted" : "bg-primary/10"
+            "p-2.5 rounded-full",
+            privacyMode ? "bg-muted/60" : "bg-primary/8"
           )}>
             {privacyMode ? (
               <Ghost className="h-5 w-5 text-muted-foreground" />
@@ -335,11 +335,11 @@ export const ChatCompanion: React.FC = () => {
             )}
           </div>
           <div>
-            <h3 className="font-semibold">
+            <h3 className="font-semibold text-[15px]">
               {privacyMode ? 'Ghost Mode Active' : 'SpiritGuide'}
             </h3>
-            <p className="text-xs text-muted-foreground">
-              {privacyMode ? 'Messages not saved' : 'Your compassionate companion'}
+            <p className="text-xs text-muted-foreground/80">
+              {privacyMode ? 'Messages not saved' : 'Here to listen'}
             </p>
           </div>
         </div>
@@ -351,24 +351,24 @@ export const ChatCompanion: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
+                  className="h-9 w-9 rounded-full text-muted-foreground/70 hover:text-destructive hover:bg-destructive/8"
                   title="Clear chat"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="rounded-2xl">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Clear conversation?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete all messages in this conversation. This action cannot be undone.
+                  <AlertDialogDescription className="leading-relaxed">
+                    This will permanently delete all messages. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={clearChat}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    className="bg-destructive/90 text-destructive-foreground hover:bg-destructive rounded-full"
                   >
                     Clear chat
                   </AlertDialogAction>
@@ -381,19 +381,19 @@ export const ChatCompanion: React.FC = () => {
             <a
               href="tel:988"
               className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium",
-                "bg-destructive text-destructive-foreground animate-pulse"
+                "flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium",
+                "bg-destructive/90 text-destructive-foreground"
               )}
             >
               <Phone className="h-4 w-4" />
-              Crisis Line: 988
+              988
             </a>
           )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
         {messages.length === 0 && !streamingContent && (
           <div className="text-center py-10 px-4">
             <Bot className="h-14 w-14 mx-auto mb-5 text-primary/40" />
@@ -474,30 +474,30 @@ export const ChatCompanion: React.FC = () => {
             <div className={cn(
               "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
               message.role === 'user' 
-                ? "bg-primary text-primary-foreground" 
-                : theme === 'warm' ? "bg-sage-light" : "bg-accent/20"
+                ? "bg-primary/90 text-primary-foreground" 
+                : theme === 'warm' ? "bg-sage-light/60" : "bg-muted/60"
             )}>
               {message.role === 'user' ? (
                 <User className="h-4 w-4" />
               ) : privacyMode ? (
                 <Ghost className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <Bot className="h-4 w-4 text-primary" />
+                <Bot className="h-4 w-4 text-primary/80" />
               )}
             </div>
             <div className={cn(
-              "max-w-[75%] rounded-2xl px-4 py-3",
+              "max-w-[70%] rounded-2xl px-4 py-3",
               message.role === 'user'
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary/90 text-primary-foreground"
                 : message.isError
-                  ? "bg-destructive/10 border border-destructive/20"
+                  ? "bg-destructive/8 border border-destructive/15"
                   : theme === 'warm' 
-                    ? "bg-secondary" 
-                    : "bg-muted"
+                    ? "bg-secondary/70" 
+                    : "bg-muted/50"
             )}>
               {message.isError && (
-                <div className="flex items-center gap-2 mb-1 text-destructive">
-                  <AlertCircle className="h-4 w-4" />
+                <div className="flex items-center gap-2 mb-1.5 text-destructive/80">
+                  <AlertCircle className="h-3.5 w-3.5" />
                   <span className="text-xs font-medium">Error</span>
                 </div>
               )}
@@ -513,21 +513,21 @@ export const ChatCompanion: React.FC = () => {
           <div className="flex gap-3 animate-fade-in">
             <div className={cn(
               "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-              theme === 'warm' ? "bg-sage-light" : "bg-accent/20"
+              theme === 'warm' ? "bg-sage-light/60" : "bg-muted/60"
             )}>
               {privacyMode ? (
                 <Ghost className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <Bot className="h-4 w-4 text-primary" />
+                <Bot className="h-4 w-4 text-primary/80" />
               )}
             </div>
             <div className={cn(
-              "max-w-[75%] rounded-2xl px-4 py-3",
-              theme === 'warm' ? "bg-secondary" : "bg-muted"
+              "max-w-[70%] rounded-2xl px-4 py-3",
+              theme === 'warm' ? "bg-secondary/70" : "bg-muted/50"
             )}>
               <p className="text-sm leading-relaxed whitespace-pre-wrap">
                 {streamingContent}
-                <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse" />
+                <span className="inline-block w-1.5 h-4 ml-1 bg-primary/40 rounded-sm animate-pulse" />
               </p>
             </div>
           </div>
@@ -537,18 +537,18 @@ export const ChatCompanion: React.FC = () => {
           <div className="flex gap-3">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center",
-              theme === 'warm' ? "bg-sage-light" : "bg-accent/20"
+              theme === 'warm' ? "bg-sage-light/60" : "bg-muted/60"
             )}>
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <Loader2 className="h-4 w-4 animate-spin text-primary/70" />
             </div>
             <div className={cn(
               "rounded-2xl px-4 py-3",
-              theme === 'warm' ? "bg-secondary" : "bg-muted"
+              theme === 'warm' ? "bg-secondary/70" : "bg-muted/50"
             )}>
-              <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="flex gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>

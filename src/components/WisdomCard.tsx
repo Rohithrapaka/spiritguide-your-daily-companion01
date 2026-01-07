@@ -15,10 +15,10 @@ export const WisdomCard: React.FC = () => {
 
   return (
     <div className={cn(
-      "relative overflow-hidden rounded-3xl p-6 md:p-8",
-      "transition-all duration-500",
+      "relative overflow-hidden rounded-3xl p-7 md:p-9",
+      "transition-all duration-300",
       theme === 'warm' 
-        ? "warm-card bg-gradient-to-br from-card via-card to-secondary/30" 
+        ? "warm-card bg-gradient-to-br from-card via-card to-secondary/20" 
         : "glass-card"
     )}>
       {/* Decorative elements */}
@@ -47,12 +47,12 @@ export const WisdomCard: React.FC = () => {
         </div>
 
         <blockquote className="relative">
-          <Quote className="absolute -top-2 -left-2 h-8 w-8 text-primary/20" />
-          <p className="font-serif text-xl md:text-2xl leading-relaxed pl-6 mb-4">
+          <Quote className="absolute -top-2 -left-2 h-8 w-8 text-primary/15" />
+          <p className="font-serif text-xl md:text-2xl leading-[1.7] pl-6 mb-5">
             "{quote.text}"
           </p>
           <footer className="pl-6">
-            <cite className="text-muted-foreground font-medium not-italic">
+            <cite className="text-muted-foreground/80 font-medium not-italic text-sm">
               — {quote.source}
             </cite>
           </footer>

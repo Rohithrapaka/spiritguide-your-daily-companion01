@@ -119,43 +119,51 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Nunito', sans-serif;
+    line-height: 1.7;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Playfair Display', serif;
+    line-height: 1.4;
+  }
+
+  p {
+    line-height: 1.75;
   }
 }
 
 @layer components {
   /* Glassmorphism card for dark theme */
   .glass-card {
-    @apply relative overflow-hidden;
+    @apply relative overflow-hidden rounded-3xl;
     background: linear-gradient(
       135deg,
-      hsl(var(--card) / 0.8) 0%,
-      hsl(var(--card) / 0.6) 100%
+      hsl(var(--card) / 0.7) 0%,
+      hsl(var(--card) / 0.5) 100%
     );
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid hsl(var(--border) / 0.3);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--border) / 0.2);
+    box-shadow: 0 8px 32px -12px hsl(var(--foreground) / 0.06);
   }
 
   .dark .glass-card {
     background: linear-gradient(
       135deg,
-      hsl(235 40% 15% / 0.7) 0%,
-      hsl(260 35% 18% / 0.5) 100%
+      hsl(235 40% 14% / 0.65) 0%,
+      hsl(260 35% 16% / 0.45) 100%
     );
-    border: 1px solid hsl(var(--border) / 0.2);
+    border: 1px solid hsl(var(--border) / 0.15);
     box-shadow: 
-      0 8px 32px -8px hsl(230 50% 5% / 0.4),
-      inset 0 1px 0 0 hsl(var(--foreground) / 0.05);
+      0 12px 40px -12px hsl(230 50% 5% / 0.35),
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.04);
   }
 
-  /* Warm card */
+  /* Warm card - softer appearance */
   .warm-card {
-    @apply bg-card rounded-2xl;
-    box-shadow: var(--shadow-card);
+    @apply bg-card rounded-3xl;
+    box-shadow: 0 8px 32px -12px hsl(30 20% 40% / 0.08);
+    border: 1px solid hsl(var(--border) / 0.4);
   }
 
   /* Floating animation */
