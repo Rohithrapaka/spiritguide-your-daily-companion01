@@ -45,8 +45,11 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
         <h3 className="font-serif text-2xl font-semibold mb-2">
           {hasCheckedInToday ? 'Update Your Mood' : 'How Are You Feeling?'}
         </h3>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground mb-1">
           Take a moment to check in with yourself
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          This helps personalize your conversation experience
         </p>
       </div>
 
@@ -82,8 +85,11 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
 
       {/* Mood Tags Grid */}
       <div className="mb-6">
-        <p className="text-sm font-medium text-muted-foreground mb-3 text-center">
+        <p className="text-sm font-medium text-muted-foreground mb-1 text-center">
           Select how you're feeling
+        </p>
+        <p className="text-xs text-muted-foreground/60 mb-4 text-center">
+          Optional — skip if you prefer
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {moodTags.map(({ tag, icon, color }) => (
@@ -91,11 +97,11 @@ export const MoodCheckin: React.FC<MoodCheckinProps> = ({ onComplete }) => {
               key={tag}
               onClick={() => toggleMoodTag(tag)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300",
-                "border-2 font-medium text-sm",
+                "flex items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-200",
+                "border font-medium text-sm",
                 currentTags.includes(tag)
-                  ? cn(color, "border-current shadow-sm scale-105")
-                  : "border-border hover:border-primary/30 bg-secondary/50"
+                  ? cn(color, "border-current shadow-sm scale-[1.02]")
+                  : "border-border/60 hover:border-primary/40 hover:bg-secondary/70 bg-secondary/40"
               )}
             >
               {icon}

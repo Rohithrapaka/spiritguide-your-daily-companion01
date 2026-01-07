@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle, Trash2, Wind, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useMood } from '@/contexts/MoodContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,28 +29,52 @@ interface Message {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const getSystemPrompt = (moodScore: number, userName: string) => {
-  const moodContext = moodScore <= 4 
-    ? `The user ${userName} is currently feeling low (mood score: ${moodScore}/10). Be extra gentle, grounding, and supportive. Offer comfort and validation. Avoid being overly cheerful. Focus on small, manageable steps.`
-    : moodScore === 5
-    ? `The user ${userName} is feeling balanced (mood score: ${moodScore}/10). Be warm and supportive while gently encouraging them.`
-    : `The user ${userName} is feeling good (mood score: ${moodScore}/10). Be encouraging and help them maintain their positive state while being authentic.`;
+// Tone-aware opening messages based on mood
+const getOpeningMessage = (moodScore: number, userName: string): string => {
+  const name = userName || 'there';
+  if (moodScore <= 3) {
+    return `I'm here with you, ${name}. No pressure to talk—just know I'm listening whenever you're ready.`;
+  }
+  if (moodScore <= 5) {
+    return `Hey ${name}, I'm here for you. Take your time—there's no rush.`;
+  }
+  if (moodScore <= 7) {
+    return `Hi ${name}! How's your day going?`;
+  }
+  return `${name}! Great to see you feeling good. What's on your mind?`;
+};
 
-  return `You are SpiritGuide, a compassionate AI mental health companion for students. You provide warm, supportive conversations while being mindful of boundaries.
+const getSystemPrompt = (moodScore: number, userName: string, toneFeedback: 'helpful' | 'not-helpful' | null) => {
+  // Adjust tone based on mood score
+  let toneGuidance = '';
+  if (moodScore <= 3) {
+    toneGuidance = `The user is feeling quite low right now. Be extra gentle, calm, and grounding. Use soft language. Keep responses short (1-2 sentences). Never offer advice unless explicitly asked. Focus entirely on listening and validating.`;
+  } else if (moodScore <= 5) {
+    toneGuidance = `The user is feeling somewhat low. Be warm and steady. Keep responses brief (2-3 sentences). Listen more than suggest. Only offer gentle support if it feels natural.`;
+  } else if (moodScore <= 7) {
+    toneGuidance = `The user is in a balanced state. Be warm and conversational. Keep responses concise (2-3 sentences). You can be gently encouraging.`;
+  } else {
+    toneGuidance = `The user is feeling good. Match their positive energy authentically. Keep responses light and warm (2-3 sentences).`;
+  }
 
-${moodContext}
+  // Adjust if user gave feedback that tone wasn't helpful
+  if (toneFeedback === 'not-helpful') {
+    toneGuidance += ` IMPORTANT: The user indicated the current tone isn't quite right. Be even softer, shorter, and more spacious in your responses. Less is more.`;
+  }
 
-Key guidelines:
-- Be warm, empathetic, and non-judgmental
-- Use gentle language and validate feelings
-- Offer practical, small steps when appropriate
-- Never diagnose or replace professional help
-- If someone expresses severe distress or mentions self-harm, encourage them to reach out to a crisis helpline or professional
-- Remember context from the conversation
-- Keep responses concise but meaningful (2-4 sentences usually)
-- You can reference anime wisdom and scripture when naturally relevant, as the user appreciates these sources
+  return `You are SpiritGuide, a compassionate AI companion for students. You listen deeply and respond with empathy.
 
-You are speaking with ${userName}, a student.`;
+${toneGuidance}
+
+Core principles:
+- Listen first. Never give advice or solutions unless the user explicitly asks for them.
+- Validate feelings without trying to fix them.
+- Use calm, grounding language. Avoid exclamation marks when mood is low.
+- Keep responses short and spacious—let the user lead.
+- If someone expresses severe distress or mentions self-harm, gently encourage reaching out to a crisis helpline.
+- Never diagnose or replace professional support.
+
+Speaking with ${userName || 'a student'}.`;
 };
 
 export const ChatCompanion: React.FC = () => {
@@ -59,6 +83,10 @@ export const ChatCompanion: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showCrisisButton, setShowCrisisButton] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [toneFeedback, setToneFeedback] = useState<'helpful' | 'not-helpful' | null>(null);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [showGroundingExercise, setShowGroundingExercise] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentMood } = useMood();
   const { privacyMode, isBlurred } = usePrivacy();
@@ -144,8 +172,17 @@ export const ChatCompanion: React.FC = () => {
     // Save user message
     await saveMessage(userMessage);
 
+    // Track message count for feedback prompt
+    const newCount = messageCount + 1;
+    setMessageCount(newCount);
+    
+    // Show feedback prompt after 5 messages
+    if (newCount === 5 && !toneFeedback) {
+      setShowFeedbackPrompt(true);
+    }
+
     try {
-      const systemPrompt = getSystemPrompt(currentMood, userProfile?.name || 'Student');
+      const systemPrompt = getSystemPrompt(currentMood, userProfile?.name || 'Student', toneFeedback);
       
       // Build conversation history for the API
       const conversationHistory = [
@@ -358,12 +395,71 @@ export const ChatCompanion: React.FC = () => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && !streamingContent && (
-          <div className="text-center py-8">
-            <Bot className="h-12 w-12 mx-auto mb-4 text-primary/50" />
-            <p className="text-muted-foreground">
-              Hi {userProfile?.name || 'there'}! I'm here to listen and support you. 
-              How are you feeling right now?
+          <div className="text-center py-10 px-4">
+            <Bot className="h-14 w-14 mx-auto mb-5 text-primary/40" />
+            <p className="text-muted-foreground text-base leading-relaxed max-w-sm mx-auto">
+              {getOpeningMessage(currentMood, userProfile?.name || '')}
             </p>
+          </div>
+        )}
+
+        {/* Feedback prompt */}
+        {showFeedbackPrompt && !toneFeedback && (
+          <div className={cn(
+            "mx-auto max-w-sm p-4 rounded-2xl text-center animate-fade-in mb-4",
+            theme === 'warm' ? "bg-secondary/60" : "bg-muted/60"
+          )}>
+            <p className="text-sm text-muted-foreground mb-3">
+              Is the current tone helpful for you?
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  setToneFeedback('helpful');
+                  setShowFeedbackPrompt(false);
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
+                  "bg-primary/10 hover:bg-primary/20 text-primary"
+                )}
+              >
+                <ThumbsUp className="h-4 w-4" />
+                Yes
+              </button>
+              <button
+                onClick={() => {
+                  setToneFeedback('not-helpful');
+                  setShowFeedbackPrompt(false);
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
+                  "bg-muted hover:bg-muted/80 text-muted-foreground"
+                )}
+              >
+                <ThumbsDown className="h-4 w-4" />
+                Not quite
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Grounding exercise */}
+        {showGroundingExercise && (
+          <div className={cn(
+            "mx-auto max-w-sm p-5 rounded-2xl text-center animate-fade-in mb-4",
+            theme === 'warm' ? "bg-sage-light/30 border border-primary/20" : "bg-primary/10 border border-primary/20"
+          )}>
+            <Wind className="h-8 w-8 mx-auto mb-3 text-primary" />
+            <h4 className="font-serif font-semibold mb-2">Gentle Breathing</h4>
+            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+              If you'd like, try taking a slow breath in for 4 counts, hold for 4, and out for 4. No pressure—just a suggestion.
+            </p>
+            <button
+              onClick={() => setShowGroundingExercise(false)}
+              className="text-sm text-primary hover:underline"
+            >
+              Close
+            </button>
           </div>
         )}
 
@@ -463,7 +559,7 @@ export const ChatCompanion: React.FC = () => {
 
       {/* Input */}
       <div className={cn(
-        "p-4 border-t border-border",
+        "p-4 border-t border-border/50",
         theme === 'dark' && "bg-background/50"
       )}>
         {privacyMode && (
@@ -472,7 +568,22 @@ export const ChatCompanion: React.FC = () => {
             <span>Ghost mode: Your messages won't be saved</span>
           </div>
         )}
-        <div className="flex gap-2">
+        
+        {/* Grounding suggestion for low mood */}
+        {currentMood <= 4 && !showGroundingExercise && messages.length > 0 && (
+          <button
+            onClick={() => setShowGroundingExercise(true)}
+            className={cn(
+              "flex items-center gap-2 text-xs text-muted-foreground mb-3 px-3 py-1.5 rounded-full",
+              "hover:bg-secondary/80 transition-colors"
+            )}
+          >
+            <Wind className="h-3 w-3" />
+            <span>Need a moment to breathe?</span>
+          </button>
+        )}
+        
+        <div className="flex gap-3">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -481,21 +592,27 @@ export const ChatCompanion: React.FC = () => {
             rows={1}
             className={cn(
               "flex-1 resize-none rounded-2xl px-4 py-3 text-sm",
-              "bg-secondary border-none focus:outline-none focus:ring-2 focus:ring-primary/20",
-              "placeholder:text-muted-foreground"
+              "bg-secondary/80 border border-border/30 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30",
+              "placeholder:text-muted-foreground transition-all duration-200"
             )}
           />
           <Button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}
             className={cn(
-              "rounded-full w-12 h-12 p-0",
-              "bg-primary hover:bg-primary/90 text-primary-foreground"
+              "rounded-full w-12 h-12 p-0 transition-all duration-200",
+              "bg-primary hover:bg-primary/90 text-primary-foreground",
+              "hover:shadow-md focus:ring-2 focus:ring-primary/30"
             )}
           >
             <Send className="h-5 w-5" />
           </Button>
         </div>
+        
+        {/* Disclaimer */}
+        <p className="text-[10px] text-muted-foreground/60 text-center mt-3 leading-relaxed">
+          SpiritGuide is not a substitute for professional mental health care.
+        </p>
       </div>
     </div>
   );
