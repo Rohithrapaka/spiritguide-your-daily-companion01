@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useTypingAnalytics } from '@/hooks/useTypingAnalytics';
 import { VoiceJournal } from './VoiceJournal';
+import { MiniPet } from './MiniPet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -355,7 +356,7 @@ export const ChatCompanion: React.FC = () => {
 
   return (
     <div className={cn(
-      "flex flex-col h-[540px] rounded-3xl overflow-hidden transition-all duration-300",
+      "relative flex flex-col h-[540px] rounded-3xl overflow-hidden transition-all duration-300",
       theme === 'warm' ? "warm-card" : "glass-card",
       isBlurred && "privacy-blur"
     )}>
@@ -655,6 +656,9 @@ export const ChatCompanion: React.FC = () => {
           SpiritGuide is not a substitute for professional mental health care.
         </p>
       </div>
+
+      {/* Mini Pet - roams/sleeps based on mood */}
+      <MiniPet />
     </div>
   );
 };
