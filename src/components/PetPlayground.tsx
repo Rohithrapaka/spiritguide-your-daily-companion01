@@ -1,357 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMood } from '@/contexts/MoodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Heart, Cookie, Check, Sparkles } from 'lucide-react';
+import { Check, Cookie, Hand } from 'lucide-react';
+import { PetSVG } from './pet/PetSVG';
+import { HeartParticles, ExcitementParticles, NuzzleEffect, EatingEffect } from './pet/PetParticles';
+import { FoodSystem, FoodItem, getRandomFoodType } from './pet/FoodSystem';
 
 type PetType = 'dog' | 'cat' | 'fish';
 
-interface FoodItem {
+interface Position {
+  x: number;
+  y: number;
+}
+
+interface HeartParticle {
   id: number;
   x: number;
   y: number;
 }
 
-// SVG Pet Components
-const DogPet: React.FC<{ isPetting: boolean; isEating: boolean }> = ({ isPetting, isEating }) => (
-  <svg width="80" height="80" viewBox="0 0 100 100" className="drop-shadow-lg">
-    <defs>
-      <radialGradient id="dogFur" cx="50%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#d4a574" />
-        <stop offset="100%" stopColor="#a67c52" />
-      </radialGradient>
-      <radialGradient id="dogBelly" cx="50%" cy="50%" r="60%">
-        <stop offset="0%" stopColor="#f5e6d3" />
-        <stop offset="100%" stopColor="#e8d5c4" />
-      </radialGradient>
-    </defs>
-    {/* Body */}
-    <motion.ellipse
-      cx="50" cy="60" rx="30" ry="25"
-      fill="url(#dogFur)"
-      animate={isPetting ? { scaleY: [1, 0.9, 1.05, 1], scaleX: [1, 1.05, 0.95, 1] } : {}}
-      transition={{ duration: 0.5 }}
-    />
-    {/* Belly */}
-    <ellipse cx="50" cy="65" rx="18" ry="15" fill="url(#dogBelly)" />
-    {/* Head */}
-    <motion.circle
-      cx="50" cy="35" r="22"
-      fill="url(#dogFur)"
-      animate={isPetting ? { scale: [1, 1.05, 1] } : isEating ? { y: [0, 5, 0] } : {}}
-      transition={{ duration: 0.3 }}
-    />
-    {/* Ears */}
-    <motion.ellipse
-      cx="30" cy="25" rx="10" ry="15"
-      fill="#8b6914"
-      animate={isPetting ? { rotate: [-5, 5, -5] } : {}}
-      transition={{ duration: 0.3 }}
-      style={{ transformOrigin: '30px 35px' }}
-    />
-    <motion.ellipse
-      cx="70" cy="25" rx="10" ry="15"
-      fill="#8b6914"
-      animate={isPetting ? { rotate: [5, -5, 5] } : {}}
-      transition={{ duration: 0.3 }}
-      style={{ transformOrigin: '70px 35px' }}
-    />
-    {/* Eyes */}
-    <motion.ellipse
-      cx="42" cy="32" rx="5" ry={isPetting ? 2 : 6}
-      fill="#3d2914"
-      animate={isEating ? { scaleY: [1, 0.5, 1] } : {}}
-    />
-    <motion.ellipse
-      cx="58" cy="32" rx="5" ry={isPetting ? 2 : 6}
-      fill="#3d2914"
-      animate={isEating ? { scaleY: [1, 0.5, 1] } : {}}
-    />
-    {/* Eye highlights */}
-    {!isPetting && (
-      <>
-        <circle cx="44" cy="30" r="2" fill="white" opacity="0.8" />
-        <circle cx="60" cy="30" r="2" fill="white" opacity="0.8" />
-      </>
-    )}
-    {/* Nose */}
-    <ellipse cx="50" cy="42" rx="5" ry="4" fill="#3d2914" />
-    {/* Mouth */}
-    {isPetting ? (
-      <path d="M44 48 Q50 55 56 48" fill="none" stroke="#3d2914" strokeWidth="2" strokeLinecap="round" />
-    ) : isEating ? (
-      <ellipse cx="50" cy="50" rx="4" ry="3" fill="#3d2914" />
-    ) : (
-      <path d="M46 48 Q50 52 54 48" fill="none" stroke="#3d2914" strokeWidth="2" strokeLinecap="round" />
-    )}
-    {/* Tail */}
-    <motion.path
-      d="M78 55 Q90 45 85 60 Q80 70 75 65"
-      fill="url(#dogFur)"
-      animate={isPetting ? { rotate: [-20, 20, -20, 20, 0] } : { rotate: [0, 10, 0] }}
-      transition={{ duration: isPetting ? 0.6 : 1, repeat: isPetting ? 0 : Infinity }}
-      style={{ transformOrigin: '78px 60px' }}
-    />
-    {/* Legs */}
-    <ellipse cx="35" cy="82" rx="6" ry="8" fill="#a67c52" />
-    <ellipse cx="65" cy="82" rx="6" ry="8" fill="#a67c52" />
-    {/* Tongue when happy */}
-    {isPetting && (
-      <motion.ellipse
-        cx="50" cy="54" rx="4" ry="6"
-        fill="#ff6b8a"
-        initial={{ scaleY: 0 }}
-        animate={{ scaleY: 1 }}
-        style={{ transformOrigin: '50px 48px' }}
-      />
-    )}
-  </svg>
-);
-
-const CatPet: React.FC<{ isPetting: boolean; isEating: boolean }> = ({ isPetting, isEating }) => (
-  <svg width="80" height="80" viewBox="0 0 100 100" className="drop-shadow-lg">
-    <defs>
-      <radialGradient id="catFur" cx="50%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#6b7280" />
-        <stop offset="100%" stopColor="#4b5563" />
-      </radialGradient>
-      <radialGradient id="catBelly" cx="50%" cy="50%" r="60%">
-        <stop offset="0%" stopColor="#e5e7eb" />
-        <stop offset="100%" stopColor="#d1d5db" />
-      </radialGradient>
-    </defs>
-    {/* Body */}
-    <motion.ellipse
-      cx="50" cy="60" rx="28" ry="22"
-      fill="url(#catFur)"
-      animate={isPetting ? { scaleY: [1, 0.85, 1.08, 1], scaleX: [1, 1.08, 0.92, 1] } : {}}
-      transition={{ duration: 0.5 }}
-    />
-    {/* Belly */}
-    <ellipse cx="50" cy="65" rx="16" ry="12" fill="url(#catBelly)" />
-    {/* Head */}
-    <motion.circle
-      cx="50" cy="35" r="20"
-      fill="url(#catFur)"
-      animate={isPetting ? { scale: [1, 1.05, 1] } : isEating ? { y: [0, 3, 0] } : {}}
-      transition={{ duration: 0.3 }}
-    />
-    {/* Ears */}
-    <motion.path
-      d="M30 30 L25 10 L40 25 Z"
-      fill="url(#catFur)"
-      animate={isPetting ? { rotate: [-5, 5, -5] } : {}}
-      transition={{ duration: 0.3 }}
-    />
-    <path d="M32 28 L28 15 L38 26 Z" fill="#ffc0cb" />
-    <motion.path
-      d="M70 30 L75 10 L60 25 Z"
-      fill="url(#catFur)"
-      animate={isPetting ? { rotate: [5, -5, 5] } : {}}
-      transition={{ duration: 0.3 }}
-    />
-    <path d="M68 28 L72 15 L62 26 Z" fill="#ffc0cb" />
-    {/* Eyes */}
-    <motion.ellipse
-      cx="42" cy="33" rx="5" ry={isPetting ? 1 : 6}
-      fill="#10b981"
-      animate={isEating ? { scaleY: [1, 0.5, 1] } : {}}
-    />
-    <motion.ellipse
-      cx="58" cy="33" rx="5" ry={isPetting ? 1 : 6}
-      fill="#10b981"
-      animate={isEating ? { scaleY: [1, 0.5, 1] } : {}}
-    />
-    {/* Pupils */}
-    {!isPetting && (
-      <>
-        <ellipse cx="42" cy="33" rx="2" ry="5" fill="#1f2937" />
-        <ellipse cx="58" cy="33" rx="2" ry="5" fill="#1f2937" />
-        <circle cx="43" cy="31" r="1.5" fill="white" opacity="0.8" />
-        <circle cx="59" cy="31" r="1.5" fill="white" opacity="0.8" />
-      </>
-    )}
-    {/* Nose */}
-    <path d="M47 42 L50 45 L53 42 Z" fill="#ffc0cb" />
-    {/* Mouth */}
-    {isPetting ? (
-      <path d="M44 48 Q50 54 56 48" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" />
-    ) : (
-      <>
-        <path d="M50 46 L50 49" stroke="#4b5563" strokeWidth="1.5" />
-        <path d="M47 49 Q50 52 53 49" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    )}
-    {/* Whiskers */}
-    <g stroke="#9ca3af" strokeWidth="1">
-      <line x1="20" y1="40" x2="35" y2="42" />
-      <line x1="20" y1="45" x2="35" y2="45" />
-      <line x1="65" y1="42" x2="80" y2="40" />
-      <line x1="65" y1="45" x2="80" y2="45" />
-    </g>
-    {/* Tail */}
-    <motion.path
-      d="M75 60 Q95 40 90 70 Q85 85 78 75"
-      fill="url(#catFur)"
-      stroke="none"
-      animate={isPetting ? { d: ["M75 60 Q95 40 90 70 Q85 85 78 75", "M75 60 Q100 35 95 65 Q90 80 80 72", "M75 60 Q95 40 90 70 Q85 85 78 75"] } : {}}
-      transition={{ duration: 0.8 }}
-    />
-    {/* Legs */}
-    <ellipse cx="35" cy="80" rx="5" ry="7" fill="#4b5563" />
-    <ellipse cx="65" cy="80" rx="5" ry="7" fill="#4b5563" />
-  </svg>
-);
-
-const FishPet: React.FC<{ isPetting: boolean; isEating: boolean }> = ({ isPetting, isEating }) => (
-  <svg width="80" height="80" viewBox="0 0 100 100" className="drop-shadow-lg">
-    <defs>
-      <radialGradient id="fishBody" cx="30%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#60a5fa" />
-        <stop offset="50%" stopColor="#3b82f6" />
-        <stop offset="100%" stopColor="#2563eb" />
-      </radialGradient>
-      <radialGradient id="fishBelly" cx="50%" cy="70%" r="50%">
-        <stop offset="0%" stopColor="#e0f2fe" />
-        <stop offset="100%" stopColor="#bae6fd" />
-      </radialGradient>
-    </defs>
-    {/* Body */}
-    <motion.ellipse
-      cx="45" cy="50" rx="30" ry="20"
-      fill="url(#fishBody)"
-      animate={isPetting ? { scaleY: [1, 0.9, 1.1, 1], scaleX: [1, 1.05, 0.95, 1] } : {}}
-      transition={{ duration: 0.5 }}
-    />
-    {/* Belly */}
-    <ellipse cx="40" cy="55" rx="18" ry="10" fill="url(#fishBelly)" />
-    {/* Tail */}
-    <motion.path
-      d="M75 50 L95 35 L90 50 L95 65 Z"
-      fill="url(#fishBody)"
-      animate={{ rotate: [-5, 5, -5] }}
-      transition={{ duration: 0.5, repeat: Infinity }}
-      style={{ transformOrigin: '75px 50px' }}
-    />
-    {/* Dorsal fin */}
-    <motion.path
-      d="M35 30 Q45 15 55 30"
-      fill="#2563eb"
-      animate={{ scaleY: [1, 1.1, 1] }}
-      transition={{ duration: 1, repeat: Infinity }}
-    />
-    {/* Pectoral fin */}
-    <motion.ellipse
-      cx="35" cy="58" rx="8" ry="4"
-      fill="#3b82f6"
-      animate={{ rotate: [-10, 10, -10] }}
-      transition={{ duration: 0.8, repeat: Infinity }}
-      style={{ transformOrigin: '40px 58px' }}
-    />
-    {/* Eye */}
-    <circle cx="28" cy="45" r="8" fill="white" />
-    <motion.circle
-      cx="28" cy="45" r="5"
-      fill="#1e3a8a"
-      animate={isEating ? { scale: [1, 0.8, 1] } : {}}
-    />
-    <circle cx="26" cy="43" r="2" fill="white" opacity="0.9" />
-    {/* Mouth */}
-    {isPetting ? (
-      <ellipse cx="12" cy="50" rx="4" ry="3" fill="#f472b6" />
-    ) : isEating ? (
-      <motion.ellipse
-        cx="12" cy="50" rx="5" ry="5"
-        fill="#1e3a8a"
-        animate={{ scale: [1, 1.3, 1] }}
-        transition={{ duration: 0.3 }}
-      />
-    ) : (
-      <ellipse cx="12" cy="50" rx="3" ry="2" fill="#1e3a8a" />
-    )}
-    {/* Scales pattern */}
-    <g fill="none" stroke="hsl(var(--primary) / 0.2)" strokeWidth="1">
-      <path d="M30 45 Q35 42 40 45" />
-      <path d="M35 50 Q40 47 45 50" />
-      <path d="M40 55 Q45 52 50 55" />
-      <path d="M45 45 Q50 42 55 45" />
-      <path d="M50 50 Q55 47 60 50" />
-    </g>
-    {/* Bubbles when happy */}
-    {isPetting && (
-      <>
-        <motion.circle
-          cx="8" cy="40" r="3"
-          fill="none"
-          stroke="#93c5fd"
-          strokeWidth="1"
-          initial={{ y: 0, opacity: 1 }}
-          animate={{ y: -20, opacity: 0 }}
-          transition={{ duration: 1, repeat: Infinity }}
-        />
-        <motion.circle
-          cx="5" cy="45" r="2"
-          fill="none"
-          stroke="#93c5fd"
-          strokeWidth="1"
-          initial={{ y: 0, opacity: 1 }}
-          animate={{ y: -15, opacity: 0 }}
-          transition={{ duration: 0.8, repeat: Infinity, delay: 0.3 }}
-        />
-      </>
-    )}
-  </svg>
-);
-
-// Heart particle component
-const HeartParticle: React.FC<{ x: number; y: number }> = ({ x, y }) => (
-  <motion.div
-    className="absolute pointer-events-none"
-    style={{ left: x - 10, top: y - 10 }}
-    initial={{ opacity: 1, scale: 0, y: 0 }}
-    animate={{ opacity: 0, scale: 1.5, y: -50 }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.8 }}
-  >
-    <Heart className="w-5 h-5 text-pink-400 fill-pink-400" />
-  </motion.div>
-);
-
-// Food component
-const FallingFood: React.FC<{ x: number; onLand: (y: number) => void }> = ({ x, onLand }) => {
-  return (
-    <motion.div
-      className="absolute"
-      style={{ left: x - 15 }}
-      initial={{ top: -30, rotate: 0 }}
-      animate={{ top: '70%', rotate: 360 }}
-      transition={{ duration: 1.5, ease: 'easeIn' }}
-      onAnimationComplete={() => onLand(70)}
-    >
-      <Cookie className="w-8 h-8 text-amber-500" />
-    </motion.div>
-  );
-};
-
 export const PetPlayground: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { currentMood, moodHistory } = useMood();
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // Pet state
   const [selectedPet, setSelectedPet] = useState<PetType>('dog');
-  const [isPetting, setIsPetting] = useState(false);
-  const [isEating, setIsEating] = useState(false);
-  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
-  const [foods, setFoods] = useState<FoodItem[]>([]);
   const [showSelection, setShowSelection] = useState(false);
   
-  // Cursor following with spring physics
-  const cursorX = useMotionValue(0);
-  const cursorY = useMotionValue(0);
-  const springX = useSpring(cursorX, { stiffness: 100, damping: 20 });
-  const springY = useSpring(cursorY, { stiffness: 100, damping: 20 });
+  // Position and movement
+  const [position, setPosition] = useState<Position>({ x: 200, y: 150 });
+  const [targetPosition, setTargetPosition] = useState<Position>({ x: 200, y: 150 });
+  const [isMoving, setIsMoving] = useState(false);
+  const [facingDirection, setFacingDirection] = useState<'left' | 'right'>('right');
+  
+  // Interaction states
+  const [isPetting, setIsPetting] = useState(false);
+  const [isBlinking, setIsBlinking] = useState(false);
+  const [isEating, setIsEating] = useState(false);
+  const [isNuzzling, setIsNuzzling] = useState(false);
+  const [isExcited, setIsExcited] = useState(false);
+  const [isHiding, setIsHiding] = useState(false);
+  
+  // Particles and effects
+  const [hearts, setHearts] = useState<HeartParticle[]>([]);
+  const [foods, setFoods] = useState<FoodItem[]>([]);
+  const [showEatingEffect, setShowEatingEffect] = useState(false);
+  const [eatingPosition, setEatingPosition] = useState<Position>({ x: 0, y: 0 });
+  
+  // Refs for tracking
+  const cursorRef = useRef<Position>({ x: 0, y: 0 });
+  const lastCursorMoveRef = useRef<number>(Date.now());
+  const clickCountRef = useRef<number>(0);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const containerSizeRef = useRef({ width: 800, height: 500 });
+
+  // Mood calculation
+  const lastMoodScore = moodHistory.length > 0 ? moodHistory[0].score : currentMood;
+  const isSad = lastMoodScore < 4;
+  const petSize = isSad ? 300 : 350; // Slightly smaller when sad
+  const moveSpeed = isSad ? 0.025 : 0.045;
 
   // Load pet type from profile
   useEffect(() => {
@@ -383,22 +97,227 @@ export const PetPlayground: React.FC = () => {
     }
   };
 
-  // Handle cursor movement
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // Update container size
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        containerSizeRef.current = {
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight
+        };
+      }
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  // Smooth movement animation loop
+  useEffect(() => {
+    const animate = () => {
+      setPosition(prev => {
+        const dx = targetPosition.x - prev.x;
+        const dy = targetPosition.y - prev.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 3) {
+          setIsMoving(false);
+          return prev;
+        }
+
+        // Ease-out movement - slower as it approaches target
+        const easeAmount = Math.min(1, distance / 150);
+        const speed = moveSpeed * (0.3 + easeAmount * 0.7);
+
+        const newX = prev.x + dx * speed;
+        const newY = prev.y + dy * speed;
+
+        // Update facing direction
+        if (Math.abs(dx) > 2) {
+          setFacingDirection(dx > 0 ? 'right' : 'left');
+        }
+        
+        setIsMoving(true);
+        return { x: newX, y: newY };
+      });
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [targetPosition, moveSpeed]);
+
+  // Blinking animation
+  useEffect(() => {
+    const blink = () => {
+      setIsBlinking(true);
+      setTimeout(() => setIsBlinking(false), 150);
+    };
+
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7) blink();
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Click to move handler
+  const handlePlaygroundClick = useCallback((e: React.MouseEvent) => {
     if (!containerRef.current) return;
+    if ((e.target as HTMLElement).closest('button')) return; // Ignore button clicks
+
     const rect = containerRef.current.getBoundingClientRect();
-    cursorX.set(e.clientX - rect.left - 40);
-    cursorY.set(e.clientY - rect.top - 40);
+    const x = e.clientX - rect.left - petSize / 2;
+    const y = e.clientY - rect.top - petSize / 2;
+
+    // Bound within container
+    const boundedX = Math.max(0, Math.min(rect.width - petSize, x));
+    const boundedY = Math.max(0, Math.min(rect.height - petSize, y));
+
+    setTargetPosition({ x: boundedX, y: boundedY });
+    setIsHiding(false);
+
+    // Track rapid clicks for excitement
+    clickCountRef.current++;
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+
+    if (clickCountRef.current >= 5) {
+      triggerExcitement();
+      clickCountRef.current = 0;
+    }
+
+    clickTimeoutRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 1000);
+  }, [petSize]);
+
+  // Excitement spin animation
+  const triggerExcitement = () => {
+    setIsExcited(true);
+    
+    // Circular spin path
+    const centerX = position.x + petSize / 2;
+    const centerY = position.y + petSize / 2;
+    const radius = 60;
+    
+    let angle = 0;
+    const spinInterval = setInterval(() => {
+      angle += 30;
+      if (angle >= 720) { // Two full rotations
+        clearInterval(spinInterval);
+        setIsExcited(false);
+        return;
+      }
+      
+      const rad = (angle * Math.PI) / 180;
+      setTargetPosition({
+        x: centerX + Math.cos(rad) * radius - petSize / 2,
+        y: centerY + Math.sin(rad) * radius - petSize / 2
+      });
+    }, 50);
   };
 
-  // Handle petting
-  const handlePetHover = (e: React.MouseEvent) => {
+  // Track cursor for nuzzle behavior
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    cursorRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+    lastCursorMoveRef.current = Date.now();
+  }, []);
+
+  // Nuzzle behavior
+  useEffect(() => {
+    const checkNuzzle = setInterval(() => {
+      const timeSinceMove = Date.now() - lastCursorMoveRef.current;
+      
+      if (timeSinceMove >= 3000 && !isNuzzling && !isMoving && !isEating) {
+        const petCenterX = position.x + petSize / 2;
+        const petCenterY = position.y + petSize / 2;
+        const dx = cursorRef.current.x - petCenterX;
+        const dy = cursorRef.current.y - petCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 250 && distance > 80) {
+          // Move toward cursor for nuzzle
+          setTargetPosition({
+            x: cursorRef.current.x - petSize / 2,
+            y: cursorRef.current.y - petSize / 2
+          });
+          setIsNuzzling(true);
+
+          setTimeout(() => {
+            setIsNuzzling(false);
+          }, 2500);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(checkNuzzle);
+  }, [position, petSize, isNuzzling, isMoving, isEating]);
+
+  // Random hide & seek behavior
+  useEffect(() => {
+    if (isSad) return; // Don't hide when sad
+
+    const scheduleHide = () => {
+      const delay = 20000 + Math.random() * 40000; // 20-60 seconds
+      
+      const timeout = setTimeout(() => {
+        if (!containerRef.current) return;
+        
+        const rect = containerRef.current.getBoundingClientRect();
+        
+        // Move partially off-screen
+        const side = Math.random() > 0.5 ? 'left' : 'right';
+        const hideSpot = side === 'left'
+          ? { x: -petSize * 0.6, y: position.y }
+          : { x: rect.width - petSize * 0.4, y: position.y };
+
+        setTargetPosition(hideSpot);
+        setIsHiding(true);
+
+        // Peek out after a bit
+        setTimeout(() => {
+          if (isHiding) {
+            setTargetPosition({
+              x: side === 'left' ? -petSize * 0.3 : rect.width - petSize * 0.7,
+              y: hideSpot.y
+            });
+          }
+        }, 3000);
+
+        scheduleHide();
+      }, delay);
+
+      return () => clearTimeout(timeout);
+    };
+
+    const cleanup = scheduleHide();
+    return cleanup;
+  }, [isSad, petSize, position.y, isHiding]);
+
+  // Pet hover (petting) handler
+  const handlePetHover = () => {
     if (!isPetting) {
       setIsPetting(true);
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const x = e.clientX - rect.left + Math.random() * 20 - 10;
-      const y = e.clientY - rect.top;
-      setHearts(prev => [...prev, { id: Date.now(), x, y }]);
+      // Spawn hearts
+      const newHearts = Array.from({ length: 3 }, (_, i) => ({
+        id: Date.now() + i,
+        x: position.x + petSize / 2 + (Math.random() - 0.5) * 100,
+        y: position.y + 50
+      }));
+      setHearts(prev => [...prev, ...newHearts]);
     }
   };
 
@@ -406,40 +325,51 @@ export const PetPlayground: React.FC = () => {
     setIsPetting(false);
   };
 
-  // Handle feeding
-  const handleFeed = () => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const randomX = Math.random() * (rect.width - 60) + 30;
-      setFoods(prev => [...prev, { id: Date.now(), x: randomX, y: 0 }]);
-    }
-  };
-
-  const handleFoodLand = (foodId: number) => {
-    setIsEating(true);
-    setTimeout(() => {
-      setFoods(prev => prev.filter(f => f.id !== foodId));
-      setIsEating(false);
-    }, 500);
-  };
-
   // Clean up hearts
   useEffect(() => {
     if (hearts.length > 0) {
       const timer = setTimeout(() => {
         setHearts(prev => prev.slice(1));
-      }, 800);
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [hearts]);
 
-  const renderPet = () => {
-    const props = { isPetting, isEating };
-    switch (selectedPet) {
-      case 'dog': return <DogPet {...props} />;
-      case 'cat': return <CatPet {...props} />;
-      case 'fish': return <FishPet {...props} />;
-    }
+  // Feed handler
+  const handleFeed = () => {
+    if (!containerRef.current || foods.length >= 3) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const randomX = 100 + Math.random() * (rect.width - 200);
+    
+    setFoods(prev => [...prev, { 
+      id: Date.now(), 
+      x: randomX, 
+      y: 0,
+      type: getRandomFoodType(selectedPet)
+    }]);
+  };
+
+  // Food landed - pet chases it
+  const handleFoodLand = (foodId: number, x: number, y: number) => {
+    // Pet rushes to food
+    setTargetPosition({ 
+      x: x - petSize / 2, 
+      y: y - petSize / 2 - 50
+    });
+
+    // Start eating animation after reaching food
+    setTimeout(() => {
+      setIsEating(true);
+      setEatingPosition({ x: x, y: y - 40 });
+      setShowEatingEffect(true);
+      
+      setTimeout(() => {
+        setFoods(prev => prev.filter(f => f.id !== foodId));
+        setIsEating(false);
+        setShowEatingEffect(false);
+      }, 800);
+    }, 600);
   };
 
   const petIcons = {
@@ -450,6 +380,13 @@ export const PetPlayground: React.FC = () => {
 
   return (
     <div className="relative w-full h-full min-h-[500px] flex flex-col">
+      {/* Custom cursor styling */}
+      <style>{`
+        .pet-playground-cursor {
+          cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%23d4a574' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v0'/%3E%3Cpath d='M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/svg%3E") 16 16, pointer;
+        }
+      `}</style>
+
       {/* Selection Modal */}
       <AnimatePresence>
         {showSelection && (
@@ -506,7 +443,10 @@ export const PetPlayground: React.FC = () => {
       <div className="flex items-center justify-between px-6 py-4">
         <div>
           <h2 className="font-serif text-lg font-semibold">Pet Playground</h2>
-          <p className="text-sm text-muted-foreground">Move your cursor to play!</p>
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <Hand className="w-4 h-4" />
+            Click anywhere to call your pet!
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -521,9 +461,11 @@ export const PetPlayground: React.FC = () => {
           </button>
           <button
             onClick={handleFeed}
+            disabled={foods.length >= 3}
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all",
-              "bg-primary/90 text-primary-foreground hover:bg-primary shadow-sm"
+              "bg-primary/90 text-primary-foreground hover:bg-primary shadow-sm",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             <Cookie className="w-4 h-4" />
@@ -535,9 +477,10 @@ export const PetPlayground: React.FC = () => {
       {/* Playground Area */}
       <div
         ref={containerRef}
+        onClick={handlePlaygroundClick}
         onMouseMove={handleMouseMove}
         className={cn(
-          "relative flex-1 mx-4 mb-4 rounded-3xl overflow-hidden cursor-none",
+          "relative flex-1 mx-4 mb-4 rounded-3xl overflow-hidden pet-playground-cursor",
           "bg-gradient-to-b from-emerald-100/80 via-green-200/60 to-emerald-300/40",
           "dark:from-emerald-900/30 dark:via-green-800/20 dark:to-emerald-700/30"
         )}
@@ -549,64 +492,99 @@ export const PetPlayground: React.FC = () => {
         }}
       >
         {/* Ground/grass effect */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-emerald-400/40 to-transparent dark:from-emerald-600/20" />
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-emerald-400/50 to-transparent dark:from-emerald-600/30" />
         
-        {/* Decorative elements */}
-        <div className="absolute bottom-4 left-8 w-3 h-8 bg-emerald-500/30 rounded-full dark:bg-emerald-400/20" />
-        <div className="absolute bottom-4 left-12 w-2 h-6 bg-emerald-600/30 rounded-full dark:bg-emerald-500/20" />
-        <div className="absolute bottom-4 right-10 w-3 h-10 bg-emerald-500/30 rounded-full dark:bg-emerald-400/20" />
-        <div className="absolute bottom-4 right-16 w-2 h-7 bg-emerald-600/30 rounded-full dark:bg-emerald-500/20" />
+        {/* Decorative grass blades */}
+        <div className="absolute bottom-4 left-8 w-3 h-12 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+        <div className="absolute bottom-4 left-14 w-2 h-8 bg-emerald-600/40 rounded-full dark:bg-emerald-500/25" />
+        <div className="absolute bottom-4 left-20 w-3 h-10 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+        <div className="absolute bottom-4 right-10 w-3 h-14 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+        <div className="absolute bottom-4 right-18 w-2 h-9 bg-emerald-600/40 rounded-full dark:bg-emerald-500/25" />
+        <div className="absolute bottom-4 right-24 w-3 h-11 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
 
-        {/* Falling food */}
-        <AnimatePresence>
-          {foods.map((food) => (
-            <FallingFood
-              key={food.id}
-              x={food.x}
-              onLand={() => handleFoodLand(food.id)}
-            />
-          ))}
-        </AnimatePresence>
+        {/* Food system */}
+        <FoodSystem 
+          foods={foods} 
+          onFoodLand={handleFoodLand}
+          containerHeight={containerSizeRef.current.height}
+        />
+
+        {/* Heart particles */}
+        <HeartParticles particles={hearts} />
+        
+        {/* Excitement particles */}
+        <ExcitementParticles 
+          isActive={isExcited} 
+          centerX={position.x + petSize / 2} 
+          centerY={position.y + petSize / 2}
+        />
+
+        {/* Nuzzle effect */}
+        <NuzzleEffect 
+          isActive={isNuzzling}
+          x={position.x + petSize / 2}
+          y={position.y}
+        />
+
+        {/* Eating effect */}
+        <EatingEffect 
+          isActive={showEatingEffect}
+          x={eatingPosition.x}
+          y={eatingPosition.y}
+        />
 
         {/* The Pet */}
         <motion.div
-          className="absolute cursor-pointer"
-          style={{ x: springX, y: springY }}
+          className="absolute pointer-events-auto"
+          style={{ 
+            left: position.x, 
+            top: position.y,
+            width: petSize,
+            height: petSize
+          }}
+          animate={
+            isExcited 
+              ? { rotate: [0, 15, -15, 15, -15, 0] }
+              : isMoving 
+                ? { y: [0, -8, 0] }
+                : {}
+          }
+          transition={{
+            duration: isExcited ? 0.3 : 0.35,
+            repeat: isExcited ? Infinity : isMoving ? Infinity : 0,
+            ease: "easeInOut"
+          }}
           onMouseEnter={handlePetHover}
           onMouseLeave={handlePetLeave}
         >
-          {renderPet()}
-          
-          {/* Heart particles */}
-          <AnimatePresence>
-            {hearts.map((heart) => (
-              <HeartParticle key={heart.id} x={heart.x} y={heart.y} />
-            ))}
-          </AnimatePresence>
+          <PetSVG
+            type={selectedPet}
+            size={petSize}
+            isPetting={isPetting || isNuzzling}
+            isEating={isEating}
+            isBlinking={isBlinking}
+            isSad={isSad}
+            facingDirection={facingDirection}
+            isMoving={isMoving}
+          />
         </motion.div>
 
-        {/* Sparkles when petting */}
-        {isPetting && (
-          <motion.div
-            className="absolute pointer-events-none"
-            style={{ x: springX, y: springY }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.div
-              className="absolute -top-4 -right-4"
-              animate={{ scale: [0, 1, 0], rotate: [0, 180, 360] }}
-              transition={{ duration: 0.8, repeat: Infinity }}
-            >
-              <Sparkles className="w-5 h-5 text-yellow-400" />
-            </motion.div>
-          </motion.div>
-        )}
+        {/* Mood indicator */}
+        <div className="absolute top-4 left-4">
+          <div className={cn(
+            "px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm",
+            isSad 
+              ? "bg-blue-100/80 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+              : "bg-green-100/80 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+          )}>
+            {isSad ? '😢 Feeling low...' : '😊 Happy!'}
+          </div>
+        </div>
 
         {/* Instructions */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center">
-          <p className="text-xs text-muted-foreground/70 bg-background/50 px-4 py-2 rounded-full backdrop-blur-sm">
-            Hover over your pet to show love 💕
+          <p className="text-xs text-muted-foreground/80 bg-background/60 px-4 py-2 rounded-full backdrop-blur-sm">
+            Hover to pet • Click to call • Rapid clicks for excitement! 💕
           </p>
         </div>
       </div>

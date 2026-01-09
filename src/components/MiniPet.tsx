@@ -153,8 +153,11 @@ export const MiniPet: React.FC = () => {
     }
   };
 
+  // Pounce on new messages when happy
+  const [isPouncing, setIsPouncing] = useState(false);
+
   return (
-    <div className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none overflow-hidden">
+    <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none overflow-hidden">
       <motion.div
         className="absolute bottom-1 flex items-end"
         animate={{ 
@@ -163,21 +166,23 @@ export const MiniPet: React.FC = () => {
         }}
         transition={{ 
           type: "spring", 
-          stiffness: 80, 
-          damping: 15 
+          stiffness: isSad ? 40 : 80, 
+          damping: isSad ? 20 : 15 
         }}
       >
-        {/* The pet */}
+        {/* The pet with mood-aware animation */}
         <motion.div
           animate={
             isHappy 
-              ? { y: [0, -8, 0] } 
+              ? isPouncing
+                ? { y: [0, -25, 0], scale: [1, 1.15, 1] }
+                : { y: [0, -10, 0] } 
               : isSad 
-                ? { rotate: [0, -5, 0] }
-                : { y: [0, -2, 0] }
+                ? { rotate: [0, -5, 0], scale: 0.9 }
+                : { y: [0, -3, 0] }
           }
           transition={{ 
-            duration: isHappy ? 0.8 : 2, 
+            duration: isHappy ? 0.6 : isSad ? 3 : 2, 
             repeat: Infinity,
             ease: "easeInOut"
           }}
@@ -185,9 +190,9 @@ export const MiniPet: React.FC = () => {
           {renderPet()}
         </motion.div>
 
-        {/* Zzz particles when sleeping */}
+        {/* Zzz particles when sleeping/sad */}
         {isSad && (
-          <div className="absolute -top-4 -right-2">
+          <div className="absolute -top-6 -right-2">
             <ZzzParticle delay={0} />
             <ZzzParticle delay={0.8} />
             <ZzzParticle delay={1.6} />
@@ -197,11 +202,11 @@ export const MiniPet: React.FC = () => {
         {/* Happy sparkle */}
         {isHappy && (
           <motion.div
-            className="absolute -top-2 left-1/2 -translate-x-1/2"
+            className="absolute -top-3 left-1/2 -translate-x-1/2"
             animate={{ scale: [0, 1, 0], opacity: [0, 1, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
+            transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1.5 }}
           >
-            <span className="text-yellow-400 text-xs">✨</span>
+            <span className="text-yellow-400 text-sm">✨</span>
           </motion.div>
         )}
       </motion.div>
