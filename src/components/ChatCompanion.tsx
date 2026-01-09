@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle, Trash2, Wind, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Send, Bot, User, Ghost, Phone, Loader2, AlertCircle, Trash2, Wind, ThumbsUp, ThumbsDown, Mic } from 'lucide-react';
 import { useMood } from '@/contexts/MoodContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { useTypingAnalytics } from '@/hooks/useTypingAnalytics';
+import { VoiceJournal } from './VoiceJournal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +27,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isError?: boolean;
+  isVoice?: boolean;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -44,7 +47,7 @@ const getOpeningMessage = (moodScore: number, userName: string): string => {
   return `${name}! Great to see you feeling good. What's on your mind?`;
 };
 
-const getSystemPrompt = (moodScore: number, userName: string, toneFeedback: 'helpful' | 'not-helpful' | null) => {
+const getSystemPrompt = (moodScore: number, userName: string, toneFeedback: 'helpful' | 'not-helpful' | null, isVoiceMessage: boolean = false) => {
   // Adjust tone based on mood score
   let toneGuidance = '';
   if (moodScore <= 3) {
@@ -62,9 +65,17 @@ const getSystemPrompt = (moodScore: number, userName: string, toneFeedback: 'hel
     toneGuidance += ` IMPORTANT: The user indicated the current tone isn't quite right. Be even softer, shorter, and more spacious in your responses. Less is more.`;
   }
 
+  // Special handling for voice messages
+  let voiceGuidance = '';
+  if (isVoiceMessage) {
+    voiceGuidance = `
+IMPORTANT: The user is speaking this out loud via voice journal. Respond with high empathy. Use phrases like "I hear that in your voice" or "I'm right here with you" or "Thank you for sharing that with me." Be extra present and validating.`;
+  }
+
   return `You are SpiritGuide, a compassionate AI companion for students. You listen deeply and respond with empathy.
 
 ${toneGuidance}
+${voiceGuidance}
 
 Core principles:
 - Listen first. Never give advice or solutions unless the user explicitly asks for them.
@@ -86,12 +97,16 @@ export const ChatCompanion: React.FC = () => {
   const [toneFeedback, setToneFeedback] = useState<'helpful' | 'not-helpful' | null>(null);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [showGroundingExercise, setShowGroundingExercise] = useState(false);
+  const [showVoiceJournal, setShowVoiceJournal] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentMood } = useMood();
   const { privacyMode, isBlurred } = usePrivacy();
   const { user, userProfile } = useAuth();
   const { theme } = useTheme();
+  
+  // Typing analytics for behavioral insights
+  const { metrics, handleKeyDown, markNudgeSent, saveAverageWPM } = useTypingAnalytics();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,24 +168,28 @@ export const ChatCompanion: React.FC = () => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (customInput?: string, isVoice: boolean = false) => {
+    const messageText = customInput || input.trim();
+    if (!messageText || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
-      timestamp: new Date()
+      content: messageText,
+      timestamp: new Date(),
+      isVoice,
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const userInput = input.trim();
-    setInput('');
+    if (!customInput) setInput('');
     setIsLoading(true);
     setStreamingContent('');
 
     // Save user message
     await saveMessage(userMessage);
+    
+    // Save typing average periodically
+    await saveAverageWPM();
 
     // Track message count for feedback prompt
     const newCount = messageCount + 1;
@@ -182,12 +201,12 @@ export const ChatCompanion: React.FC = () => {
     }
 
     try {
-      const systemPrompt = getSystemPrompt(currentMood, userProfile?.name || 'Student', toneFeedback);
+      const systemPrompt = getSystemPrompt(currentMood, userProfile?.name || 'Student', toneFeedback, isVoice);
       
       // Build conversation history for the API
       const conversationHistory = [
         ...messages.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user' as const, content: userInput }
+        { role: 'user' as const, content: messageText }
       ];
 
       // Call with streaming
@@ -252,7 +271,7 @@ export const ChatCompanion: React.FC = () => {
 
       // Check for crisis keywords
       const crisisKeywords = ['suicide', 'hurt myself', 'end it', 'kill myself', 'self-harm'];
-      if (crisisKeywords.some(kw => userInput.toLowerCase().includes(kw))) {
+      if (crisisKeywords.some(kw => messageText.toLowerCase().includes(kw))) {
         setShowCrisisButton(true);
       }
 
@@ -286,7 +305,29 @@ export const ChatCompanion: React.FC = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  // Handle voice transcription
+  const handleVoiceTranscription = (text: string, isVoice: boolean) => {
+    setShowVoiceJournal(false);
+    sendMessage(text, isVoice);
+  };
+
+  // Check for typing nudge
+  useEffect(() => {
+    if (metrics.shouldNudge && !isLoading && messages.length > 2) {
+      const userName = userProfile?.name || 'there';
+      const nudgeMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `You seem a little tired, ${userName}. Is it time for a 5-minute screen break? 💙`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, nudgeMessage]);
+      markNudgeSent();
+    }
+  }, [metrics.shouldNudge, isLoading, messages.length, userProfile?.name, markNudgeSent]);
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    handleKeyDown(e);
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -597,7 +638,7 @@ export const ChatCompanion: React.FC = () => {
             )}
           />
           <Button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={!input.trim() || isLoading}
             className={cn(
               "rounded-full w-12 h-12 p-0 transition-all duration-200",
