@@ -5,13 +5,14 @@ import { MoodCheckin } from '@/components/MoodCheckin';
 import { DailyChallenges } from '@/components/DailyChallenges';
 import { ChatCompanion } from '@/components/ChatCompanion';
 import { MoodAnalytics } from '@/components/MoodAnalytics';
+import { PetPlayground } from '@/components/PetPlayground';
 import { useTheme } from '@/contexts/ThemeContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useMood } from '@/contexts/MoodContext';
 import { cn } from '@/lib/utils';
-import { MessageCircle, BarChart3, Home as HomeIcon, Sparkles } from 'lucide-react';
+import { MessageCircle, BarChart3, Home as HomeIcon, Sparkles, PawPrint } from 'lucide-react';
 
-type Tab = 'home' | 'chat' | 'progress';
+type Tab = 'home' | 'chat' | 'progress' | 'pet';
 
 export const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -22,6 +23,7 @@ export const Dashboard: React.FC = () => {
   const tabs = [
     { id: 'home' as Tab, label: 'Home', icon: HomeIcon },
     { id: 'chat' as Tab, label: 'Chat', icon: MessageCircle },
+    { id: 'pet' as Tab, label: 'Pet', icon: PawPrint },
     { id: 'progress' as Tab, label: 'Progress', icon: BarChart3 },
   ];
 
@@ -115,6 +117,17 @@ export const Dashboard: React.FC = () => {
         {activeTab === 'progress' && (
           <div className="max-w-3xl mx-auto animate-fade-in">
             <MoodAnalytics />
+          </div>
+        )}
+
+        {activeTab === 'pet' && (
+          <div className="max-w-4xl mx-auto animate-fade-in h-[calc(100vh-200px)]">
+            <div className={cn(
+              "h-full rounded-3xl overflow-hidden",
+              theme === 'warm' ? "warm-card" : "glass-card"
+            )}>
+              <PetPlayground />
+            </div>
           </div>
         )}
       </main>
