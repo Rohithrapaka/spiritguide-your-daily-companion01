@@ -93,6 +93,10 @@ export type Database = {
           id: string
           major: string | null
           name: string
+          pet_energy: number | null
+          pet_level: number | null
+          pet_type: string | null
+          typing_average_wpm: number | null
           updated_at: string
           user_id: string
         }
@@ -102,6 +106,10 @@ export type Database = {
           id?: string
           major?: string | null
           name: string
+          pet_energy?: number | null
+          pet_level?: number | null
+          pet_type?: string | null
+          typing_average_wpm?: number | null
           updated_at?: string
           user_id: string
         }
@@ -111,6 +119,10 @@ export type Database = {
           id?: string
           major?: string | null
           name?: string
+          pet_energy?: number | null
+          pet_level?: number | null
+          pet_type?: string | null
+          typing_average_wpm?: number | null
           updated_at?: string
           user_id?: string
         }
