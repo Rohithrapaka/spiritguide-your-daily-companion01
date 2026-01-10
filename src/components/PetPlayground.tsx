@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 import { useMood } from '@/contexts/MoodContext';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Check, Cookie, Hand, Sparkles } from 'lucide-react';
-import { EvolutionPetSVG, getEvolutionSize } from './pet/EvolutionPetSVG';
+import { Check, Cookie, Hand } from 'lucide-react';
+import { PetSVG } from './pet/PetSVG';
 import { HeartParticles, ExcitementParticles, NuzzleEffect, EatingEffect } from './pet/PetParticles';
 import { FoodSystem, FoodItem, getRandomFoodType } from './pet/FoodSystem';
-import { NameTag } from './pet/NameTag';
-import { LoveMeter } from './pet/LoveMeter';
-import { LevelUpEffect, LovePopup } from './pet/LevelUpEffect';
-import { usePetEvolution, getEvolutionStage } from '@/hooks/usePetEvolution';
 
 type PetType = 'dog' | 'cat' | 'fish';
 
@@ -26,22 +24,13 @@ interface HeartParticle {
 }
 
 export const PetPlayground: React.FC = () => {
+  const { user } = useAuth();
   const { theme } = useTheme();
   const { currentMood, moodHistory } = useMood();
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Pet evolution system
-  const { 
-    petProfile, 
-    evolutionStage, 
-    updatePetName, 
-    updatePetType, 
-    addLovePoints,
-    triggerLevelUp,
-    setTriggerLevelUp
-  } = usePetEvolution();
-  
   // Pet state
+  const [selectedPet, setSelectedPet] = useState<PetType>('dog');
   const [showSelection, setShowSelection] = useState(false);
   
   // Position and movement
@@ -63,8 +52,6 @@ export const PetPlayground: React.FC = () => {
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [showEatingEffect, setShowEatingEffect] = useState(false);
   const [eatingPosition, setEatingPosition] = useState<Position>({ x: 0, y: 0 });
-  const [showLovePopup, setShowLovePopup] = useState(false);
-  const [lovePopupPos, setLovePopupPos] = useState<Position>({ x: 0, y: 0 });
   
   // Refs for tracking
   const cursorRef = useRef<Position>({ x: 0, y: 0 });
@@ -77,16 +64,37 @@ export const PetPlayground: React.FC = () => {
   // Mood calculation
   const lastMoodScore = moodHistory.length > 0 ? moodHistory[0].score : currentMood;
   const isSad = lastMoodScore < 4;
-  
-  // Size based on evolution stage and mood
-  const baseSize = 350 * getEvolutionSize(evolutionStage);
-  const petSize = isSad ? baseSize * 0.9 : baseSize;
-  const moveSpeed = isSad ? 0.02 : 0.045;
+  const petSize = isSad ? 300 : 350; // Slightly smaller when sad
+  const moveSpeed = isSad ? 0.025 : 0.045;
+
+  // Load pet type from profile
+  useEffect(() => {
+    const loadPetType = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('pet_type')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (data?.pet_type && ['dog', 'cat', 'fish'].includes(data.pet_type)) {
+        setSelectedPet(data.pet_type as PetType);
+      }
+    };
+    loadPetType();
+  }, [user]);
 
   // Save pet selection
   const handlePetSelect = async (pet: PetType) => {
-    await updatePetType(pet);
+    setSelectedPet(pet);
     setShowSelection(false);
+    
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ pet_type: pet })
+        .eq('user_id', user.id);
+    }
   };
 
   // Update container size

@@ -91,14 +91,11 @@ export type Database = {
           age: number | null
           created_at: string
           id: string
-          love_points: number | null
           major: string | null
           name: string
           pet_energy: number | null
           pet_level: number | null
-          pet_name: string | null
           pet_type: string | null
-          total_challenges_completed: number | null
           typing_average_wpm: number | null
           updated_at: string
           user_id: string
@@ -107,14 +104,11 @@ export type Database = {
           age?: number | null
           created_at?: string
           id?: string
-          love_points?: number | null
           major?: string | null
           name: string
           pet_energy?: number | null
           pet_level?: number | null
-          pet_name?: string | null
           pet_type?: string | null
-          total_challenges_completed?: number | null
           typing_average_wpm?: number | null
           updated_at?: string
           user_id: string
@@ -123,14 +117,11 @@ export type Database = {
           age?: number | null
           created_at?: string
           id?: string
-          love_points?: number | null
           major?: string | null
           name?: string
           pet_energy?: number | null
           pet_level?: number | null
-          pet_name?: string | null
           pet_type?: string | null
-          total_challenges_completed?: number | null
           typing_average_wpm?: number | null
           updated_at?: string
           user_id?: string
