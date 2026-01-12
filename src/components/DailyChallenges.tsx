@@ -59,7 +59,7 @@ export const DailyChallenges: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     const completedArray = Array.from(newCompletedIds);
 
-    // Upsert: insert or update on conflict
+    // Upsert daily challenges
     const { error } = await supabase
       .from('daily_challenges')
       .upsert({
@@ -72,6 +72,22 @@ export const DailyChallenges: React.FC = () => {
 
     if (error) {
       console.error('Error saving challenges:', error);
+      return;
+    }
+
+    // Update total_challenges_completed in profile for pet evolution
+    if (isCompleting) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('total_challenges_completed')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      const currentTotal = profile?.total_challenges_completed || 0;
+      await supabase
+        .from('profiles')
+        .update({ total_challenges_completed: currentTotal + 1 })
+        .eq('user_id', user.id);
     }
   };
 
