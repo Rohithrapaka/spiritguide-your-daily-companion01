@@ -31,7 +31,7 @@ export const getEvolutionProgress = (totalChallenges: number): number => {
 };
 
 // ===== BABY DOG - Cute Puppy =====
-const BabyDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const BabyDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 280, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-xl">
@@ -161,7 +161,7 @@ const BabyDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({
 );
 
 // ===== TEEN DOG - Golden Retriever =====
-const TeenDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const TeenDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 340, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-2xl">
@@ -300,7 +300,7 @@ const TeenDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({
 );
 
 // ===== GUARDIAN DOG - Celestial Winged Dog =====
-const GuardianDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const GuardianDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 400, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-2xl">
@@ -490,7 +490,7 @@ const GuardianDogSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = (
 );
 
 // ===== BABY CAT - Cute Kitten =====
-const BabyCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const BabyCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 280, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-xl">
@@ -614,7 +614,7 @@ const BabyCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({
 );
 
 // ===== TEEN CAT - Calico =====
-const TeenCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const TeenCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 340, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-2xl">
@@ -745,7 +745,7 @@ const TeenCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({
 );
 
 // ===== GUARDIAN CAT - Nine-Tailed Zen Cat =====
-const GuardianCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const GuardianCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 400, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-2xl">
@@ -943,7 +943,7 @@ const GuardianCatSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = (
 );
 
 // ===== BABY FISH - Small Fry =====
-const BabyFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const BabyFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 280, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-xl">
@@ -1050,7 +1050,7 @@ const BabyFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({
 );
 
 // ===== TEEN FISH - Goldfish =====
-const TeenFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const TeenFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 340, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-2xl">
@@ -1159,7 +1159,7 @@ const TeenFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({
 );
 
 // ===== GUARDIAN FISH - Dragon Fish =====
-const GuardianFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage'>> = ({ 
+const GuardianFishSVG: React.FC<Omit<EvolutionPetSVGProps, 'type' | 'stage' | 'facingDirection'>> = ({ 
   size = 400, isPetting, isEating, isBlinking, isSad, isMoving 
 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-2xl">
