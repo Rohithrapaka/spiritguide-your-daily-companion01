@@ -5,12 +5,11 @@ import { useMood } from '@/contexts/MoodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Check, Cookie, Hand } from 'lucide-react';
-import { PetSVG } from './pet/PetSVG';
+import { Check, Cookie, Hand, Sparkles } from 'lucide-react';
+import { EvolutionPetSVG, getEvolutionStage, EvolutionStage, PetType } from './pet/EvolutionPetSVG';
 import { HeartParticles, ExcitementParticles, NuzzleEffect, EatingEffect } from './pet/PetParticles';
 import { FoodSystem, FoodItem, getRandomFoodType } from './pet/FoodSystem';
-
-type PetType = 'dog' | 'cat' | 'fish';
+import { PetNameTag, LoveMeter, EvolutionProgress, LovePopup } from './pet/PetUI';
 
 interface Position {
   x: number;
@@ -19,6 +18,13 @@ interface Position {
 
 interface HeartParticle {
   id: number;
+  x: number;
+  y: number;
+}
+
+interface LovePopupData {
+  id: number;
+  amount: number;
   x: number;
   y: number;
 }
@@ -32,6 +38,10 @@ export const PetPlayground: React.FC = () => {
   // Pet state
   const [selectedPet, setSelectedPet] = useState<PetType>('dog');
   const [showSelection, setShowSelection] = useState(false);
+  const [petName, setPetName] = useState<string>('');
+  const [lovePoints, setLovePoints] = useState(0);
+  const [totalChallenges, setTotalChallenges] = useState(0);
+  const [evolutionStage, setEvolutionStage] = useState<EvolutionStage>('baby');
   
   // Position and movement
   const [position, setPosition] = useState<Position>({ x: 200, y: 150 });
@@ -46,12 +56,14 @@ export const PetPlayground: React.FC = () => {
   const [isNuzzling, setIsNuzzling] = useState(false);
   const [isExcited, setIsExcited] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
   
   // Particles and effects
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [showEatingEffect, setShowEatingEffect] = useState(false);
   const [eatingPosition, setEatingPosition] = useState<Position>({ x: 0, y: 0 });
+  const [lovePopups, setLovePopups] = useState<LovePopupData[]>([]);
   
   // Refs for tracking
   const cursorRef = useRef<Position>({ x: 0, y: 0 });
@@ -60,28 +72,46 @@ export const PetPlayground: React.FC = () => {
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const containerSizeRef = useRef({ width: 800, height: 500 });
+  const lastPetTimeRef = useRef<number>(0);
 
-  // Mood calculation
+  // Mood calculation - enhanced mood sync
   const lastMoodScore = moodHistory.length > 0 ? moodHistory[0].score : currentMood;
   const isSad = lastMoodScore < 4;
-  const petSize = isSad ? 300 : 350; // Slightly smaller when sad
-  const moveSpeed = isSad ? 0.025 : 0.045;
+  const isVeryHappy = lastMoodScore >= 8;
+  
+  // Size based on evolution stage AND mood
+  const getBaseSizeByStage = () => {
+    switch (evolutionStage) {
+      case 'baby': return 280;
+      case 'teen': return 340;
+      case 'guardian': return 400;
+    }
+  };
+  
+  const petSize = isSad ? getBaseSizeByStage() * 0.85 : getBaseSizeByStage();
+  const moveSpeed = isSad ? 0.02 : isVeryHappy ? 0.06 : 0.045;
 
-  // Load pet type from profile
+  // Load pet data from profile
   useEffect(() => {
-    const loadPetType = async () => {
+    const loadPetData = async () => {
       if (!user) return;
       const { data } = await supabase
         .from('profiles')
-        .select('pet_type')
+        .select('pet_type, pet_name, love_points, total_challenges_completed')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
-      if (data?.pet_type && ['dog', 'cat', 'fish'].includes(data.pet_type)) {
-        setSelectedPet(data.pet_type as PetType);
+      if (data) {
+        if (data.pet_type && ['dog', 'cat', 'fish'].includes(data.pet_type)) {
+          setSelectedPet(data.pet_type as PetType);
+        }
+        setPetName(data.pet_name || '');
+        setLovePoints(data.love_points || 0);
+        setTotalChallenges(data.total_challenges_completed || 0);
+        setEvolutionStage(getEvolutionStage(data.total_challenges_completed || 0));
       }
     };
-    loadPetType();
+    loadPetData();
   }, [user]);
 
   // Save pet selection
@@ -95,6 +125,38 @@ export const PetPlayground: React.FC = () => {
         .update({ pet_type: pet })
         .eq('user_id', user.id);
     }
+  };
+
+  // Save pet name
+  const handleNameChange = async (newName: string) => {
+    setPetName(newName);
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ pet_name: newName })
+        .eq('user_id', user.id);
+    }
+  };
+
+  // Add love points and save
+  const addLovePoints = async (amount: number, x: number, y: number) => {
+    const newPoints = Math.min(100, lovePoints + amount);
+    setLovePoints(newPoints);
+    
+    // Show popup
+    setLovePopups(prev => [...prev, { id: Date.now(), amount, x, y }]);
+    
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ love_points: newPoints })
+        .eq('user_id', user.id);
+    }
+  };
+
+  // Remove love popup
+  const removeLovePopup = (id: number) => {
+    setLovePopups(prev => prev.filter(p => p.id !== id));
   };
 
   // Update container size
@@ -161,15 +223,15 @@ export const PetPlayground: React.FC = () => {
 
     const interval = setInterval(() => {
       if (Math.random() > 0.7) blink();
-    }, 2500);
+    }, isSad ? 4000 : 2500); // Blink slower when sad
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isSad]);
 
   // Click to move handler
   const handlePlaygroundClick = useCallback((e: React.MouseEvent) => {
     if (!containerRef.current) return;
-    if ((e.target as HTMLElement).closest('button')) return; // Ignore button clicks
+    if ((e.target as HTMLElement).closest('button')) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left - petSize / 2;
@@ -201,8 +263,8 @@ export const PetPlayground: React.FC = () => {
   // Excitement spin animation
   const triggerExcitement = () => {
     setIsExcited(true);
+    addLovePoints(5, position.x + petSize / 2, position.y);
     
-    // Circular spin path
     const centerX = position.x + petSize / 2;
     const centerY = position.y + petSize / 2;
     const radius = 60;
@@ -210,7 +272,7 @@ export const PetPlayground: React.FC = () => {
     let angle = 0;
     const spinInterval = setInterval(() => {
       angle += 30;
-      if (angle >= 720) { // Two full rotations
+      if (angle >= 720) {
         clearInterval(spinInterval);
         setIsExcited(false);
         return;
@@ -249,7 +311,6 @@ export const PetPlayground: React.FC = () => {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < 250 && distance > 80) {
-          // Move toward cursor for nuzzle
           setTargetPosition({
             x: cursorRef.current.x - petSize / 2,
             y: cursorRef.current.y - petSize / 2
@@ -266,19 +327,17 @@ export const PetPlayground: React.FC = () => {
     return () => clearInterval(checkNuzzle);
   }, [position, petSize, isNuzzling, isMoving, isEating]);
 
-  // Random hide & seek behavior
+  // Random hide & seek behavior (only when not sad)
   useEffect(() => {
-    if (isSad) return; // Don't hide when sad
+    if (isSad) return;
 
     const scheduleHide = () => {
-      const delay = 20000 + Math.random() * 40000; // 20-60 seconds
+      const delay = 25000 + Math.random() * 45000;
       
       const timeout = setTimeout(() => {
         if (!containerRef.current) return;
         
         const rect = containerRef.current.getBoundingClientRect();
-        
-        // Move partially off-screen
         const side = Math.random() > 0.5 ? 'left' : 'right';
         const hideSpot = side === 'left'
           ? { x: -petSize * 0.6, y: position.y }
@@ -287,7 +346,6 @@ export const PetPlayground: React.FC = () => {
         setTargetPosition(hideSpot);
         setIsHiding(true);
 
-        // Peek out after a bit
         setTimeout(() => {
           if (isHiding) {
             setTargetPosition({
@@ -307,10 +365,30 @@ export const PetPlayground: React.FC = () => {
     return cleanup;
   }, [isSad, petSize, position.y, isHiding]);
 
-  // Pet hover (petting) handler
+  // Sad behavior - move to corner and stay still
+  useEffect(() => {
+    if (isSad && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      // Move to bottom right corner when sad
+      setTargetPosition({
+        x: rect.width - petSize - 30,
+        y: rect.height - petSize - 30
+      });
+    }
+  }, [isSad, petSize]);
+
+  // Pet hover (petting) handler with love points
   const handlePetHover = () => {
+    const now = Date.now();
     if (!isPetting) {
       setIsPetting(true);
+      
+      // Add love points (throttled to once per second)
+      if (now - lastPetTimeRef.current > 1000) {
+        lastPetTimeRef.current = now;
+        addLovePoints(2, position.x + petSize / 2, position.y + 20);
+      }
+      
       // Spawn hearts
       const newHearts = Array.from({ length: 3 }, (_, i) => ({
         id: Date.now() + i,
@@ -335,7 +413,7 @@ export const PetPlayground: React.FC = () => {
     }
   }, [hearts]);
 
-  // Feed handler
+  // Feed handler with love points
   const handleFeed = () => {
     if (!containerRef.current || foods.length >= 3) return;
 
@@ -352,17 +430,18 @@ export const PetPlayground: React.FC = () => {
 
   // Food landed - pet chases it
   const handleFoodLand = (foodId: number, x: number, y: number) => {
-    // Pet rushes to food
     setTargetPosition({ 
       x: x - petSize / 2, 
       y: y - petSize / 2 - 50
     });
 
-    // Start eating animation after reaching food
     setTimeout(() => {
       setIsEating(true);
       setEatingPosition({ x: x, y: y - 40 });
       setShowEatingEffect(true);
+      
+      // Add love points for eating
+      addLovePoints(10, x, y - 60);
       
       setTimeout(() => {
         setFoods(prev => prev.filter(f => f.id !== foodId));
@@ -378,6 +457,12 @@ export const PetPlayground: React.FC = () => {
     fish: '🐠',
   };
 
+  const stageEmojis = {
+    baby: '🌱',
+    teen: '⭐',
+    guardian: '👑'
+  };
+
   return (
     <div className="relative w-full h-full min-h-[500px] flex flex-col">
       {/* Custom cursor styling */}
@@ -386,6 +471,23 @@ export const PetPlayground: React.FC = () => {
           cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%23d4a574' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v0'/%3E%3Cpath d='M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/svg%3E") 16 16, pointer;
         }
       `}</style>
+
+      {/* Level Up Animation */}
+      <AnimatePresence>
+        {showLevelUp && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+          >
+            <div className="flex flex-col items-center gap-4 p-8 bg-gradient-to-br from-amber-100 to-yellow-200 dark:from-amber-900/80 dark:to-yellow-800/80 rounded-3xl shadow-2xl">
+              <Sparkles className="w-16 h-16 text-amber-500 animate-pulse" />
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300">Level Up!</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Selection Modal */}
       <AnimatePresence>
@@ -439,38 +541,50 @@ export const PetPlayground: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Header */}
+      {/* Header with Pet Name, Stats */}
       <div className="flex items-center justify-between px-6 py-4">
-        <div>
-          <h2 className="font-serif text-lg font-semibold">Pet Playground</h2>
-          <p className="text-sm text-muted-foreground flex items-center gap-2">
-            <Hand className="w-4 h-4" />
-            Click anywhere to call your pet!
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="font-serif text-lg font-semibold">Pet Playground</h2>
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <Hand className="w-4 h-4" />
+              Click anywhere to call your pet!
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowSelection(true)}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
-              theme === 'warm' ? "bg-secondary hover:bg-secondary/80" : "bg-muted hover:bg-muted/80"
-            )}
-          >
-            <span>{petIcons[selectedPet]}</span>
-            Change Pet
-          </button>
-          <button
-            onClick={handleFeed}
-            disabled={foods.length >= 3}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all",
-              "bg-primary/90 text-primary-foreground hover:bg-primary shadow-sm",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-          >
-            <Cookie className="w-4 h-4" />
-            Feed
-          </button>
+        
+        <div className="flex items-center gap-4">
+          {/* Evolution Progress */}
+          <EvolutionProgress stage={evolutionStage} totalChallenges={totalChallenges} />
+          
+          {/* Love Meter */}
+          <LoveMeter lovePoints={lovePoints} />
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowSelection(true)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
+                theme === 'warm' ? "bg-secondary hover:bg-secondary/80" : "bg-muted hover:bg-muted/80"
+              )}
+            >
+              <span>{petIcons[selectedPet]}</span>
+              <span>{stageEmojis[evolutionStage]}</span>
+              Change Pet
+            </button>
+            <button
+              onClick={handleFeed}
+              disabled={foods.length >= 3}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all",
+                "bg-primary/90 text-primary-foreground hover:bg-primary shadow-sm",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+            >
+              <Cookie className="w-4 h-4" />
+              Feed (+10💕)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -481,8 +595,11 @@ export const PetPlayground: React.FC = () => {
         onMouseMove={handleMouseMove}
         className={cn(
           "relative flex-1 mx-4 mb-4 rounded-3xl overflow-hidden pet-playground-cursor",
-          "bg-gradient-to-b from-emerald-100/80 via-green-200/60 to-emerald-300/40",
-          "dark:from-emerald-900/30 dark:via-green-800/20 dark:to-emerald-700/30"
+          isSad 
+            ? "bg-gradient-to-b from-slate-200/80 via-blue-100/60 to-slate-300/40 dark:from-slate-800/30 dark:via-blue-900/20 dark:to-slate-700/30"
+            : isVeryHappy
+              ? "bg-gradient-to-b from-amber-100/80 via-yellow-200/60 to-orange-200/40 dark:from-amber-900/30 dark:via-yellow-800/20 dark:to-orange-700/30"
+              : "bg-gradient-to-b from-emerald-100/80 via-green-200/60 to-emerald-300/40 dark:from-emerald-900/30 dark:via-green-800/20 dark:to-emerald-700/30"
         )}
         style={{
           backgroundImage: `
@@ -491,16 +608,71 @@ export const PetPlayground: React.FC = () => {
           `
         }}
       >
-        {/* Ground/grass effect */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-emerald-400/50 to-transparent dark:from-emerald-600/30" />
+        {/* Ground/grass effect - changes based on mood */}
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t to-transparent",
+          isSad ? "from-slate-400/50 dark:from-slate-600/30" : "from-emerald-400/50 dark:from-emerald-600/30"
+        )} />
         
-        {/* Decorative grass blades */}
-        <div className="absolute bottom-4 left-8 w-3 h-12 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
-        <div className="absolute bottom-4 left-14 w-2 h-8 bg-emerald-600/40 rounded-full dark:bg-emerald-500/25" />
-        <div className="absolute bottom-4 left-20 w-3 h-10 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
-        <div className="absolute bottom-4 right-10 w-3 h-14 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
-        <div className="absolute bottom-4 right-18 w-2 h-9 bg-emerald-600/40 rounded-full dark:bg-emerald-500/25" />
-        <div className="absolute bottom-4 right-24 w-3 h-11 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+        {/* Decorative elements */}
+        {!isSad && (
+          <>
+            <div className="absolute bottom-4 left-8 w-3 h-12 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+            <div className="absolute bottom-4 left-14 w-2 h-8 bg-emerald-600/40 rounded-full dark:bg-emerald-500/25" />
+            <div className="absolute bottom-4 left-20 w-3 h-10 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+            <div className="absolute bottom-4 right-10 w-3 h-14 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+            <div className="absolute bottom-4 right-18 w-2 h-9 bg-emerald-600/40 rounded-full dark:bg-emerald-500/25" />
+            <div className="absolute bottom-4 right-24 w-3 h-11 bg-emerald-500/40 rounded-full dark:bg-emerald-400/25" />
+          </>
+        )}
+
+        {/* Sad atmosphere - rain drops */}
+        {isSad && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {Array.from({ length: 15 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-0.5 h-4 bg-blue-300/40 rounded-full"
+                style={{ left: `${5 + i * 6.5}%` }}
+                animate={{ y: ['0%', '100vh'], opacity: [0.4, 0] }}
+                transition={{
+                  duration: 1.5 + Math.random(),
+                  repeat: Infinity,
+                  delay: Math.random() * 2,
+                  ease: 'linear'
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Very happy - sparkles */}
+        {isVeryHappy && (
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute"
+                style={{ 
+                  left: `${10 + Math.random() * 80}%`, 
+                  top: `${10 + Math.random() * 60}%` 
+                }}
+                animate={{ 
+                  scale: [0, 1, 0], 
+                  rotate: [0, 180],
+                  opacity: [0, 1, 0] 
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.3,
+                }}
+              >
+                <Sparkles className="w-4 h-4 text-yellow-400" />
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Food system */}
         <FoodSystem 
@@ -533,7 +705,34 @@ export const PetPlayground: React.FC = () => {
           y={eatingPosition.y}
         />
 
-        {/* The Pet */}
+        {/* Love popups */}
+        {lovePopups.map(popup => (
+          <LovePopup
+            key={popup.id}
+            amount={popup.amount}
+            x={popup.x}
+            y={popup.y}
+            onComplete={() => removeLovePopup(popup.id)}
+          />
+        ))}
+
+        {/* Pet Name Tag - floating above pet */}
+        <motion.div
+          className="absolute z-20 pointer-events-auto"
+          style={{ 
+            left: position.x + petSize / 2, 
+            top: position.y - 20,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          <PetNameTag 
+            name={petName} 
+            onNameChange={handleNameChange}
+            stage={evolutionStage}
+          />
+        </motion.div>
+
+        {/* The Pet - Using Evolution SVG */}
         <motion.div
           className="absolute pointer-events-auto"
           style={{ 
@@ -547,18 +746,21 @@ export const PetPlayground: React.FC = () => {
               ? { rotate: [0, 15, -15, 15, -15, 0] }
               : isMoving 
                 ? { y: [0, -8, 0] }
-                : {}
+                : isSad
+                  ? { y: [0, 2, 0] } // Subtle breathing when sad
+                  : {}
           }
           transition={{
-            duration: isExcited ? 0.3 : 0.35,
-            repeat: isExcited ? Infinity : isMoving ? Infinity : 0,
+            duration: isExcited ? 0.3 : isSad ? 2 : 0.35,
+            repeat: isExcited ? Infinity : isMoving || isSad ? Infinity : 0,
             ease: "easeInOut"
           }}
           onMouseEnter={handlePetHover}
           onMouseLeave={handlePetLeave}
         >
-          <PetSVG
+          <EvolutionPetSVG
             type={selectedPet}
+            stage={evolutionStage}
             size={petSize}
             isPetting={isPetting || isNuzzling}
             isEating={isEating}
@@ -569,22 +771,49 @@ export const PetPlayground: React.FC = () => {
           />
         </motion.div>
 
+        {/* Zzz particles when sad and not moving */}
+        {isSad && !isMoving && (
+          <div className="absolute pointer-events-none" style={{ left: position.x + petSize - 20, top: position.y }}>
+            {[0, 1, 2].map(i => (
+              <motion.span
+                key={i}
+                className="absolute text-blue-400/70 font-bold"
+                style={{ fontSize: 12 + i * 4 }}
+                animate={{ 
+                  y: [-10 - i * 15, -30 - i * 15],
+                  x: [0, 10 + i * 5],
+                  opacity: [0.7, 0]
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.5,
+                }}
+              >
+                z
+              </motion.span>
+            ))}
+          </div>
+        )}
+
         {/* Mood indicator */}
         <div className="absolute top-4 left-4">
           <div className={cn(
             "px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm",
             isSad 
               ? "bg-blue-100/80 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-              : "bg-green-100/80 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+              : isVeryHappy
+                ? "bg-amber-100/80 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                : "bg-green-100/80 text-green-700 dark:bg-green-900/50 dark:text-green-300"
           )}>
-            {isSad ? '😢 Feeling low...' : '😊 Happy!'}
+            {isSad ? '😢 Feeling low...' : isVeryHappy ? '🌟 Ecstatic!' : '😊 Happy!'}
           </div>
         </div>
 
         {/* Instructions */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center">
           <p className="text-xs text-muted-foreground/80 bg-background/60 px-4 py-2 rounded-full backdrop-blur-sm">
-            Hover to pet • Click to call • Rapid clicks for excitement! 💕
+            Hover to pet (+2💕) • Click to call • Rapid clicks for excitement! (+5💕)
           </p>
         </div>
       </div>
