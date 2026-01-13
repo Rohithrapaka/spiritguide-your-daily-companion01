@@ -86,6 +86,84 @@ export type Database = {
         }
         Relationships: []
       }
+      pet_challenges: {
+        Row: {
+          challenge_id: string
+          challenge_type: string
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          id: string
+          pet_type: string
+          progress: number
+          reset_at: string
+          target: number
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          challenge_type: string
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          pet_type: string
+          progress?: number
+          reset_at?: string
+          target: number
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          challenge_type?: string
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          pet_type?: string
+          progress?: number
+          reset_at?: string
+          target?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pet_progress: {
+        Row: {
+          challenges_completed: number
+          created_at: string
+          evolution_stage: string
+          id: string
+          level: number
+          pet_type: string
+          updated_at: string
+          user_id: string
+          xp: number
+        }
+        Insert: {
+          challenges_completed?: number
+          created_at?: string
+          evolution_stage?: string
+          id?: string
+          level?: number
+          pet_type: string
+          updated_at?: string
+          user_id: string
+          xp?: number
+        }
+        Update: {
+          challenges_completed?: number
+          created_at?: string
+          evolution_stage?: string
+          id?: string
+          level?: number
+          pet_type?: string
+          updated_at?: string
+          user_id?: string
+          xp?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age: number | null

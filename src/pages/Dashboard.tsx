@@ -2,23 +2,29 @@ import React, { useState } from 'react';
 import { Header } from '@/components/Header';
 import { WisdomCard } from '@/components/WisdomCard';
 import { MoodCheckin } from '@/components/MoodCheckin';
-import { DailyChallenges } from '@/components/DailyChallenges';
 import { ChatCompanion } from '@/components/ChatCompanion';
 import { MoodAnalytics } from '@/components/MoodAnalytics';
 import { PetPlayground } from '@/components/PetPlayground';
+import { PetChallengesPanel } from '@/components/PetChallengesPanel';
+import { PetSelector } from '@/components/PetSelector';
+import { EvolutionModal } from '@/components/EvolutionModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useMood } from '@/contexts/MoodContext';
+import { usePetProgress } from '@/hooks/usePetProgress';
 import { cn } from '@/lib/utils';
 import { MessageCircle, BarChart3, Home as HomeIcon, Sparkles, PawPrint } from 'lucide-react';
+import { PetType } from '@/lib/petChallenges';
 
 type Tab = 'home' | 'chat' | 'progress' | 'pet';
 
 export const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [selectedPet, setSelectedPet] = useState<PetType>('dog');
   const { theme } = useTheme();
   const { isBlurred } = usePrivacy();
   const { hasCheckedInToday } = useMood();
+  const { evolutionEvent, clearEvolutionEvent, getPetProgress } = usePetProgress();
 
   const tabs = [
     { id: 'home' as Tab, label: 'Home', icon: HomeIcon },
@@ -26,6 +32,8 @@ export const Dashboard: React.FC = () => {
     { id: 'pet' as Tab, label: 'Pet', icon: PawPrint },
     { id: 'progress' as Tab, label: 'Progress', icon: BarChart3 },
   ];
+
+  const currentPetProgress = getPetProgress(selectedPet);
 
   return (
     <div className={cn(
@@ -35,6 +43,18 @@ export const Dashboard: React.FC = () => {
         : "bg-gradient-to-br from-background via-background to-secondary/10"
     )}>
       <Header />
+
+      {/* Evolution Modal */}
+      {evolutionEvent && (
+        <EvolutionModal
+          isOpen={!!evolutionEvent}
+          onClose={clearEvolutionEvent}
+          petType={evolutionEvent.petType}
+          fromStage={evolutionEvent.fromStage}
+          toStage={evolutionEvent.toStage}
+          reason={evolutionEvent.reason}
+        />
+      )}
 
       {/* Tab Navigation */}
       <div className={cn(
@@ -72,11 +92,8 @@ export const Dashboard: React.FC = () => {
             {/* Wisdom Quote */}
             <WisdomCard />
 
-            {/* Mood Check-in & Daily Challenges Grid */}
-            <div className="grid lg:grid-cols-2 gap-8">
-              <MoodCheckin />
-              <DailyChallenges />
-            </div>
+            {/* Mood Check-in */}
+            <MoodCheckin />
 
             {/* Quick Chat Prompt */}
             {hasCheckedInToday && (
@@ -121,12 +138,38 @@ export const Dashboard: React.FC = () => {
         )}
 
         {activeTab === 'pet' && (
-          <div className="max-w-4xl mx-auto animate-fade-in h-[calc(100vh-200px)]">
+          <div className="max-w-6xl mx-auto animate-fade-in">
+            {/* Pet Selector */}
             <div className={cn(
-              "h-full rounded-3xl overflow-hidden",
+              "rounded-2xl p-4 mb-6",
               theme === 'warm' ? "warm-card" : "glass-card"
             )}>
-              <PetPlayground />
+              <h3 className="text-center text-sm text-muted-foreground mb-3">
+                Choose your companion
+              </h3>
+              <PetSelector 
+                selectedPet={selectedPet} 
+                onSelectPet={setSelectedPet} 
+              />
+            </div>
+
+            {/* Pet Area + Challenges */}
+            <div className="grid lg:grid-cols-5 gap-6 h-[calc(100vh-320px)]">
+              {/* Pet Playground */}
+              <div className={cn(
+                "lg:col-span-3 rounded-3xl overflow-hidden",
+                theme === 'warm' ? "warm-card" : "glass-card"
+              )}>
+                <PetPlayground 
+                  selectedPetType={selectedPet}
+                  evolutionStage={currentPetProgress.evolutionStage}
+                />
+              </div>
+
+              {/* Challenges Panel */}
+              <div className="lg:col-span-2">
+                <PetChallengesPanel selectedPet={selectedPet} />
+              </div>
             </div>
           </div>
         )}

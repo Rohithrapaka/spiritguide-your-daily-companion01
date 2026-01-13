@@ -6,10 +6,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Check, Cookie, Hand, Sparkles } from 'lucide-react';
-import { EvolutionPetSVG, getEvolutionStage, EvolutionStage, PetType } from './pet/EvolutionPetSVG';
+import { EvolutionPetSVG, EvolutionStage } from './pet/EvolutionPetSVG';
 import { HeartParticles, ExcitementParticles, NuzzleEffect, EatingEffect } from './pet/PetParticles';
 import { FoodSystem, FoodItem, getRandomFoodType } from './pet/FoodSystem';
-import { PetNameTag, LoveMeter, EvolutionProgress, LovePopup } from './pet/PetUI';
+import { PetNameTag, LoveMeter, LovePopup } from './pet/PetUI';
+import { PetType } from '@/lib/petChallenges';
+
+interface PetPlaygroundProps {
+  selectedPetType: PetType;
+  evolutionStage: EvolutionStage;
+}
 
 interface Position {
   x: number;
@@ -29,19 +35,18 @@ interface LovePopupData {
   y: number;
 }
 
-export const PetPlayground: React.FC = () => {
+export const PetPlayground: React.FC<PetPlaygroundProps> = ({ 
+  selectedPetType,
+  evolutionStage 
+}) => {
   const { user } = useAuth();
   const { theme } = useTheme();
   const { currentMood, moodHistory } = useMood();
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Pet state
-  const [selectedPet, setSelectedPet] = useState<PetType>('dog');
-  const [showSelection, setShowSelection] = useState(false);
+  // Pet state - now controlled by props
   const [petName, setPetName] = useState<string>('');
   const [lovePoints, setLovePoints] = useState(0);
-  const [totalChallenges, setTotalChallenges] = useState(0);
-  const [evolutionStage, setEvolutionStage] = useState<EvolutionStage>('baby');
   
   // Position and movement
   const [position, setPosition] = useState<Position>({ x: 200, y: 150 });
@@ -91,41 +96,23 @@ export const PetPlayground: React.FC = () => {
   const petSize = isSad ? getBaseSizeByStage() * 0.85 : getBaseSizeByStage();
   const moveSpeed = isSad ? 0.02 : isVeryHappy ? 0.06 : 0.045;
 
-  // Load pet data from profile
+  // Load pet data from profile (only name and love points now)
   useEffect(() => {
     const loadPetData = async () => {
       if (!user) return;
       const { data } = await supabase
         .from('profiles')
-        .select('pet_type, pet_name, love_points, total_challenges_completed')
+        .select('pet_name, love_points')
         .eq('user_id', user.id)
         .maybeSingle();
       
       if (data) {
-        if (data.pet_type && ['dog', 'cat', 'fish'].includes(data.pet_type)) {
-          setSelectedPet(data.pet_type as PetType);
-        }
         setPetName(data.pet_name || '');
         setLovePoints(data.love_points || 0);
-        setTotalChallenges(data.total_challenges_completed || 0);
-        setEvolutionStage(getEvolutionStage(data.total_challenges_completed || 0));
       }
     };
     loadPetData();
   }, [user]);
-
-  // Save pet selection
-  const handlePetSelect = async (pet: PetType) => {
-    setSelectedPet(pet);
-    setShowSelection(false);
-    
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({ pet_type: pet })
-        .eq('user_id', user.id);
-    }
-  };
 
   // Save pet name
   const handleNameChange = async (newName: string) => {
@@ -424,7 +411,7 @@ export const PetPlayground: React.FC = () => {
       id: Date.now(), 
       x: randomX, 
       y: 0,
-      type: getRandomFoodType(selectedPet)
+      type: getRandomFoodType(selectedPetType)
     }]);
   };
 
@@ -489,58 +476,6 @@ export const PetPlayground: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Selection Modal */}
-      <AnimatePresence>
-        {showSelection && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-3xl"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className={cn(
-                "p-8 rounded-3xl max-w-md w-full mx-4",
-                theme === 'warm' ? "warm-card" : "glass-card"
-              )}
-            >
-              <h3 className="font-serif text-xl font-semibold text-center mb-6">
-                Choose Your Companion
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                {(['dog', 'cat', 'fish'] as PetType[]).map((pet) => (
-                  <button
-                    key={pet}
-                    onClick={() => handlePetSelect(pet)}
-                    className={cn(
-                      "relative p-6 rounded-2xl transition-all duration-300 flex flex-col items-center gap-2",
-                      selectedPet === pet
-                        ? "bg-primary/15 ring-2 ring-primary shadow-md"
-                        : "bg-muted/50 hover:bg-muted"
-                    )}
-                  >
-                    <span className="text-4xl">{petIcons[pet]}</span>
-                    <span className="text-sm font-medium capitalize">{pet}</span>
-                    {selectedPet === pet && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                      >
-                        <Check className="w-4 h-4 text-primary-foreground" />
-                      </motion.div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Header with Pet Name, Stats */}
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-4">
@@ -554,24 +489,17 @@ export const PetPlayground: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Evolution Progress */}
-          <EvolutionProgress stage={evolutionStage} totalChallenges={totalChallenges} />
-          
           {/* Love Meter */}
           <LoveMeter lovePoints={lovePoints} />
           
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowSelection(true)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
-                theme === 'warm' ? "bg-secondary hover:bg-secondary/80" : "bg-muted hover:bg-muted/80"
-              )}
-            >
-              <span>{petIcons[selectedPet]}</span>
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium",
+              theme === 'warm' ? "bg-secondary" : "bg-muted"
+            )}>
+              <span>{petIcons[selectedPetType]}</span>
               <span>{stageEmojis[evolutionStage]}</span>
-              Change Pet
-            </button>
+            </div>
             <button
               onClick={handleFeed}
               disabled={foods.length >= 3}
@@ -759,7 +687,7 @@ export const PetPlayground: React.FC = () => {
           onMouseLeave={handlePetLeave}
         >
           <EvolutionPetSVG
-            type={selectedPet}
+            type={selectedPetType}
             stage={evolutionStage}
             size={petSize}
             isPetting={isPetting || isNuzzling}
